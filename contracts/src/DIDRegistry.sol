@@ -2,7 +2,9 @@
 pragma solidity ^0.8.13;
 
 import {SystemAttribute} from "./lib/SystemAttribute.sol";
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 struct KvAttribute {
     string name;
@@ -19,30 +21,33 @@ struct ArrayAttributeItem {
     bool revoked;
 }
 
-contract DIDRegistry {
+contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
     // Add the library methods
-    using EnumerableMap for EnumerableMap.AddressToUintMap;
-    using EnumerableMap for EnumerableMap.UintToUintMap;
+    using EnumerableSet for EnumerableSet.StringSet;
+    using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     // reserved attributes
-    mapping(string => bool) _reservedAttributeNames;
+    EnumerableSet.StringSet _otherReservedAttributeNames;
     // kv attributes
-    mapping(string => bool) _kvAttributeNames;
+    EnumerableSet.StringSet _kvAttributeNames;
     // array attributes
-    mapping(string => bool) _arrayAttributeNames;
+    EnumerableSet.StringSet _arrayAttributeNames;
 
     // registrar contract address
-    EnumerableMap.AddressToUintMap _registrars;
+    EnumerableSet.AddressSet _registrars;
     // did owners
     mapping(uint128 => address) _didOwners;
+    // dids owned by a user
+    mapping(address => uint128[]) _ownedDids;
     // did controllers
-    mapping(uint128 => EnumerableMap.UintToUintMap) _didControllers;
+    mapping(uint128 => EnumerableSet.UintSet) _didControllers;
     // K-V attributes,
     mapping(uint128 => mapping(string => bytes)) _kvAttributes;
     // array attributes
     mapping(uint128 => mapping(string => ArrayAttributeItem[])) _arrayAttributes;
     // custom attribute keys
-    mapping(uint128 => string[]) _customAttributeKeys;
+    mapping(uint128 => EnumerableSet.StringSet) _customAttributeKeys;
 
     /**
      * @dev The caller account is not authorized to perform an operation.
@@ -53,6 +58,11 @@ contract DIDRegistry {
      * @dev The caller is not DID owner
      */
     error NotDIDOwner(uint128 identifier, address sender);
+
+    /**
+     * @dev The did identifier has been included in controller
+     */
+    error AlreadyIncludedInController(uint128 identifier, uint128 controller);
 
     /**
      * @dev The DID identifer has been registered
@@ -166,7 +176,7 @@ contract DIDRegistry {
      * @param oldOwner the address of the old owner
      * @param newOwner the address of the new owner
      */
-    event DIDOwnerChanged(uint128 identifier, uint128 oldOwner, address newOwner);
+    event DIDOwnerChanged(uint128 identifier, address oldOwner, address newOwner);
 
     /**
      * @dev Throws if called by any account other than the registrar.
@@ -182,7 +192,7 @@ contract DIDRegistry {
      * @dev Throws if not called by a controller.
      */
     modifier onlyDidController(uint128 identifier, uint128 controller) {
-        EnumerableMap.UintToUintMap storage controllers = _didControllers[identifier];
+        EnumerableSet.UintSet storage controllers = _didControllers[identifier];
         if (!controllers.contains(controller)) {
             revert NotController(identifier, controller);
         }
@@ -203,19 +213,31 @@ contract DIDRegistry {
         _;
     }
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        _reservedAttributeNames[SystemAttribute.RESERVE_ID] = true;
-        _reservedAttributeNames[SystemAttribute.RESERVE_OWNER] = true;
-        _reservedAttributeNames[SystemAttribute.RESERVE_CONTROLLER] = true;
+        _disableInitializers();
+    }
 
-        _arrayAttributeNames[SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD] = true;
-        _arrayAttributeNames[SystemAttribute.ARRAY_ATTRIBUTE_ALSO_KNOW_AS] = true;
-        _arrayAttributeNames[SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION] = true;
-        _arrayAttributeNames[SystemAttribute.ARRAY_ATTRIBUTE_ASSERTION_METHOD] = true;
-        _arrayAttributeNames[SystemAttribute.ARRAY_ATTRIBUTE_KEY_AGREEMENT] = true;
-        _arrayAttributeNames[SystemAttribute.ARRAY_ATTRIBUTE_CAPABILITY_INVOCATION] = true;
-        _arrayAttributeNames[SystemAttribute.ARRAY_ATTRIBUTE_CAPABILITY_DELEGATION] = true;
-        _arrayAttributeNames[SystemAttribute.ARRAY_ATTRIBUTE_SERVICE] = true;
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
+
+    function initialize(address owner) public initializer {
+        __Ownable_init(owner);
+        __UUPSUpgradeable_init();
+
+        _otherReservedAttributeNames.add(SystemAttribute.RESERVE_ID);
+        _otherReservedAttributeNames.add(SystemAttribute.RESERVE_OWNER);
+        _otherReservedAttributeNames.add(SystemAttribute.RESERVE_CONTROLLER);
+
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD);
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_ALSO_KNOW_AS);
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION);
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_ASSERTION_METHOD);
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_KEY_AGREEMENT);
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_CAPABILITY_INVOCATION);
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_CAPABILITY_DELEGATION);
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_SERVICE);
     }
 
     /**
@@ -230,6 +252,7 @@ contract DIDRegistry {
         }
 
         _didOwners[identifier] = owner;
+        _ownedDids[owner].push(identifier);
 
         emit DIDRegistered(identifier, owner);
     }
@@ -246,14 +269,6 @@ contract DIDRegistry {
         public
         onlyDidController(identifier, operator)
     {
-        if (!_kvAttributeNames[name]) {
-            revert NotKvAttribute(name);
-        }
-
-        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
-        attributes[name] = value;
-
-        emit DIDAttributeSet(identifier, operator, name, value);
     }
 
     /**
@@ -264,15 +279,6 @@ contract DIDRegistry {
      * @param name the attribute name to be set
      */
     function revokeAttribute(uint128 identifier, uint128 operator, string calldata name) public onlyDidController(identifier, operator) {
-        if (!_kvAttributeNames[name]) {
-            revert NotKvAttribute(name);
-        }
-
-        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
-
-        emit DIDAttributeRevoked(identifier, operator, name, attributes[name]);
-
-        delete attributes[name];
     }
 
     /**
@@ -287,14 +293,6 @@ contract DIDRegistry {
         public
         onlyDidController(identifier, operator)
     {
-        if (!_arrayAttributeNames[name]) {
-            revert NotArrayAttribute(name);
-        }
-
-        mapping(string => ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
-        attributes[name].push(ArrayAttributeItem(value, false));
-
-        emit DIDAttributeItemAdded(identifier, operator, name, attributes[name].length - 1, value);
     }
 
     /**
@@ -309,19 +307,6 @@ contract DIDRegistry {
         public
         onlyDidController(identifier, operator)
     {
-        if (!_arrayAttributeNames[name]) {
-            revert NotArrayAttribute(name);
-        }
-
-        mapping(string => ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
-
-        if (index > attributes[name].length - 1) {
-            revert AttributeIndexNotExist(identifier, name, index);
-        }
-
-        attributes[name][index].revoked = true;
-
-        emit DIDAttributeItemRevoked(identifier, operator, name, index, attributes[name][index].value);
     }
 
     /**
@@ -335,16 +320,18 @@ contract DIDRegistry {
     function setCustomAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
         public
         onlyDidController(identifier, operator)
-    {}
+    {
+    }
 
     /**
-     * @notice Remove an K-V attribute from a DID document
+     * @notice Remove a custom K-V attribute from a DID document
      * @dev Emit the event `DIDAttributeRevoked` if the call succeeds
      * @param identifier the identifier of the DID to be operated
      * @param operator the DID identifier which perform the operation
      * @param name the attribute name to be set
      */
-    function revokeCustomAttribute(uint128 identifier, uint128 operator, string calldata name) public onlyDidController(identifier, operator) {}
+    function revokeCustomAttribute(uint128 identifier, uint128 operator, string calldata name) public onlyDidController(identifier, operator) {
+    }
 
     /**
      * @notice Add a controller to the DID document.
@@ -356,7 +343,8 @@ contract DIDRegistry {
      * @param operator the DID identifier which perform the operation
      * @param controller the new controller identifier
      */
-    function addController(uint128 identifier, uint128 operator, uint128 controller) public onlyDidController(identifier, operator) {}
+    function addController(uint128 identifier, uint128 operator, uint128 controller) public onlyDidController(identifier, operator) {
+    }
 
     /**
      * @notice Remove a controller from the DID document.
@@ -365,7 +353,8 @@ contract DIDRegistry {
      * @param operator the DID identifier which perform the operation
      * @param controller the controller identifier to be revoked
      */
-    function revokeController(uint128 identifier, uint128 operator, uint128 controller) public onlyDidController(identifier, operator) {}
+    function revokeController(uint128 identifier, uint128 operator, uint128 controller) public onlyDidController(identifier, operator) {
+    }
 
     /**
      * @notice Transfer the owner of a DID to a new account.
@@ -373,12 +362,14 @@ contract DIDRegistry {
      * @param identifier the identifier of the DID to be operated
      * @param to the new owner address
      */
-    function transferOwner(uint128 identifier, address to) public onlyDidOwner(identifier) {}
+    function transferOwner(uint128 identifier, address to) public onlyDidOwner(identifier) {
+    }
 
     /**
      * @notice Returns all data of a DID to construct the DID document
      * @param identifier the identifier of the DID to be operated
      * @return id the identifier of the DID Document
+     * @return owner the owner address
      * @return controller the controller identifiers
      * @return kvAttributes K-V attributes
      * @return arrayAttributes
@@ -388,17 +379,34 @@ contract DIDRegistry {
         view
         returns (
             uint128 id,
+            address owner,
             uint128[] memory controller,
             KvAttribute[] memory kvAttributes,
-            ArrayAttribute[] memory arrayAttributes,
-            string[] memory customAttributeNames
+            ArrayAttribute[] memory arrayAttributes
         )
     {
+        // identifier
         id = identifier;
-        controller = new uint128[](0);
-        kvAttributes = new KvAttribute[](0);
-        arrayAttributes = new ArrayAttribute[](0);
-        customAttributeNames = new string[](0);
+        // owner
+        owner = _didOwners[identifier];
+        // controller
+        uint256[] memory controllerValues = _didControllers[identifier].values();
+        controller = new uint128[](controllerValues.length);
+        for (uint256 i = 0; i < controllerValues.length; i++) {
+            controller[i] = uint128(controllerValues[i]);
+        }
+        // kv attribute
+        kvAttributes = new KvAttribute[](_kvAttributeNames.length());
+        // array attribute
+        arrayAttributes = new ArrayAttribute[](_arrayAttributeNames.length());
+        for (uint256 i = 0; i < _arrayAttributeNames.length(); i++) {
+            string memory attributeName = _arrayAttributeNames.at(i);
+            ArrayAttributeItem[] memory attributeItems = new ArrayAttributeItem[](_arrayAttributes[identifier][attributeName].length);
+            for (uint256 j = 0; j < _arrayAttributes[identifier][attributeName].length; j++) {
+                attributeItems[j] = _arrayAttributes[identifier][attributeName][j];
+            }
+            arrayAttributes[i] = ArrayAttribute(attributeName, attributeItems);
+        }
     }
 
     /**
@@ -416,7 +424,16 @@ contract DIDRegistry {
      * @return owner the owner of `identifier`
      */
     function ownerOf(uint128 identifier) public view returns (address owner) {
-        return address(this);
+        owner = _didOwners[identifier];
+    }
+
+    /**
+     * @notice Returns dids owned by a user
+     * @param account the account to be queryed
+     * @return identifiers the did identifiers owned by `account`
+     */
+    function ownedDids(address account) public view returns (uint128[] memory identifiers) {
+        return _ownedDids[account];
     }
 
     /**
@@ -432,8 +449,8 @@ contract DIDRegistry {
      * @notice Returns the registrar address
      * @return registrars the registrar contract address
      */
-    function getRegistrar() public view returns (address[] memory registrars) {
-        registrars = _registrars.keys();
+    function getRegistrars() public view returns (address[] memory registrars) {
+        registrars = _registrars.values();
     }
 
     /**
@@ -441,7 +458,13 @@ contract DIDRegistry {
      * @param addings new registrars to add
      * @param removings registrars to remove
      */
-    function updateRegistrars(address[] calldata addings, address[] calldata removings) public view returns (address[] memory registrars) {
-        registrars = _registrars.keys();
+    function updateRegistrars(address[] calldata addings, address[] calldata removings) public onlyOwner {
+        for (uint256 i = 0; i < addings.length; i++) {
+            _registrars.add(addings[i]);
+        }
+
+        for (uint256 i = 0; i < removings.length; i++) {
+            _registrars.remove(removings[i]);
+        }
     }
 }
