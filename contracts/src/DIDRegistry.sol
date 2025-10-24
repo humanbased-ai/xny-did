@@ -39,7 +39,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
     // did owners
     mapping(uint128 => address) _didOwners;
     // dids owned by a user
-    mapping(address => uint128[]) _ownedDids;
+    mapping(address => EnumerableSet.UintSet) _ownedDids;
     // did controllers
     mapping(uint128 => EnumerableSet.UintSet) _didControllers;
     // K-V attributes,
@@ -252,7 +252,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
         }
 
         _didOwners[identifier] = owner;
-        _ownedDids[owner].push(identifier);
+        _ownedDids[owner].add(identifier);
 
         emit DIDRegistered(identifier, owner);
     }
@@ -363,6 +363,9 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
      * @param to the new owner address
      */
     function transferOwner(uint128 identifier, address to) public onlyDidOwner(identifier) {
+        emit DIDOwnerChanged(identifier, _didOwners[identifier], to);
+
+        _didOwners[identifier] = to;
     }
 
     /**
@@ -433,7 +436,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
      * @return identifiers the did identifiers owned by `account`
      */
     function ownedDids(address account) public view returns (uint128[] memory identifiers) {
-        return _ownedDids[account];
+        identifiers = new uint128[](_ownedDids[account].length());
+        for (uint256 i = 0; i < _ownedDids[account].length(); i++) {
+            identifiers[i] = uint128(_ownedDids[account].at(i));
+        }
     }
 
     /**
