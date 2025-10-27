@@ -4,8 +4,8 @@ pragma solidity ^0.8.13;
 import {SystemAttribute} from "./lib/SystemAttribute.sol";
 import {IDIDRegistry} from "./IDIDRegistry.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     // Add the library methods

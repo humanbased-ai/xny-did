@@ -10,7 +10,7 @@ library DIDGenerator {
         ))));
     }
 
-    function generateUUIDv4Uint128() internal view returns (uint128) {
+    function generateUuidv4Uint128() internal view returns (uint128) {
         uint128 rand = randomUint128();
 
         // Modify bits according to UUID v4 standard

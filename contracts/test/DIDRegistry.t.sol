@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -41,7 +41,7 @@ contract DIDRegistryTest is Test {
         proxy.updateRegistrars(addings, new address[](0));
     }
 
-    function _registerDID() internal {
+    function _registerDid() internal {
         _addRegistrar();
         vm.prank(_registrar);
         proxy.register(DID_IDENTIFIER_0, _user);
@@ -141,7 +141,7 @@ contract DIDRegistryTest is Test {
     }
 
     // function test_addItemToAttribute_should_fail_with_caller_not_owner_of_controller() public {
-    //     _registerDID();
+    //     _registerDid();
     //     vm.startPrank(_user);
     //     vm.expectRevert(
     //         abi.encodeWithSelector(
@@ -155,7 +155,7 @@ contract DIDRegistryTest is Test {
     // }
 
     function test_addItemToAttribute_should_fail_with_attribute_name_error() public {
-        _registerDID();
+        _registerDid();
         vm.startPrank(_user);
         string memory wrongAttributeName = "wrong_name";
         vm.expectRevert(
@@ -168,7 +168,7 @@ contract DIDRegistryTest is Test {
     }
 
     function test_addItemToAttribute_should_pass_with_caller_is_owner() public {
-        _registerDID();
+        _registerDid();
         vm.startPrank(_user);
         vm.expectEmit(true, false, false, true);
         emit DIDRegistry.DIDAttributeItemAdded(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0, bytes(""));
