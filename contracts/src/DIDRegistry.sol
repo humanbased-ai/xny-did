@@ -192,6 +192,11 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
      * @dev Throws if not called by a controller.
      */
     modifier onlyDidController(uint128 identifier, uint128 controller) {
+        if (owner() == _msgSender()) {
+            _;
+            return;
+        }
+        
         EnumerableSet.UintSet storage controllers = _didControllers[identifier];
         if (!controllers.contains(controller)) {
             revert NotController(identifier, controller);
