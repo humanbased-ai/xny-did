@@ -30,9 +30,15 @@ contract DIDRegistrar {
         _registry.register(identifier, address(this));
 
         for (uint256 i = 0; i < authorizations.length; ++i) {
-            _registry.addItemToAttribute(identifier, identifier, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, authorizations[i]);
-            _registry.addItemToAttribute(identifier, identifier, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION,
-                abi.encodePacked(Strings.toString(uint256(identifier)), "#", Strings.toString(i)));
+            _registry.addItemToAttribute(
+                identifier, identifier, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, authorizations[i]
+            );
+            _registry.addItemToAttribute(
+                identifier,
+                identifier,
+                SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION,
+                abi.encodePacked(Strings.toString(uint256(identifier)), "#", Strings.toString(i))
+            );
         }
 
         _registry.transferOwner(identifier, msg.sender);

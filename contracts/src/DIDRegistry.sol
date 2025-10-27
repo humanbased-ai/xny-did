@@ -182,7 +182,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
             _;
             return;
         }
-        
+
         EnumerableSet.UintSet storage controllers = _didControllers[identifier];
         if (!controllers.contains(controller)) {
             revert NotController(identifier, controller);
@@ -209,9 +209,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _disableInitializers();
     }
 
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
     function initialize(address owner) public initializer {
         __Ownable_init(owner);
@@ -259,8 +257,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function setAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
         public
         onlyDidController(identifier, operator)
-    {
-    }
+    {}
 
     /**
      * @notice Remove an K-V attribute from a DID document
@@ -269,8 +266,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param operator the DID identifier which perform the operation
      * @param name the attribute name to be set
      */
-    function revokeAttribute(uint128 identifier, uint128 operator, string calldata name) public onlyDidController(identifier, operator) {
-    }
+    function revokeAttribute(uint128 identifier, uint128 operator, string calldata name)
+        public
+        onlyDidController(identifier, operator)
+    {}
 
     /**
      * @notice Add a child attribute to a array-type attribute of the DID document
@@ -305,8 +304,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function revokeItemFromAttribute(uint128 identifier, uint128 operator, string calldata name, uint256 index)
         public
         onlyDidController(identifier, operator)
-    {
-    }
+    {}
 
     /**
      * @notice Set a custom K-V attribute to a DID document.
@@ -319,8 +317,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function setCustomAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
         public
         onlyDidController(identifier, operator)
-    {
-    }
+    {}
 
     /**
      * @notice Remove a custom K-V attribute from a DID document
@@ -329,8 +326,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param operator the DID identifier which perform the operation
      * @param name the attribute name to be set
      */
-    function revokeCustomAttribute(uint128 identifier, uint128 operator, string calldata name) public onlyDidController(identifier, operator) {
-    }
+    function revokeCustomAttribute(uint128 identifier, uint128 operator, string calldata name)
+        public
+        onlyDidController(identifier, operator)
+    {}
 
     /**
      * @notice Add a controller to the DID document.
@@ -342,8 +341,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param operator the DID identifier which perform the operation
      * @param controller the new controller identifier
      */
-    function addController(uint128 identifier, uint128 operator, uint128 controller) public onlyDidController(identifier, operator) {
-    }
+    function addController(uint128 identifier, uint128 operator, uint128 controller)
+        public
+        onlyDidController(identifier, operator)
+    {}
 
     /**
      * @notice Remove a controller from the DID document.
@@ -352,8 +353,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param operator the DID identifier which perform the operation
      * @param controller the controller identifier to be revoked
      */
-    function revokeController(uint128 identifier, uint128 operator, uint128 controller) public onlyDidController(identifier, operator) {
-    }
+    function revokeController(uint128 identifier, uint128 operator, uint128 controller)
+        public
+        onlyDidController(identifier, operator)
+    {}
 
     /**
      * @notice Transfer the owner of a DID to a new account.
@@ -405,7 +408,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         arrayAttributes = new ArrayAttribute[](_arrayAttributeNames.length());
         for (uint256 i = 0; i < _arrayAttributeNames.length(); i++) {
             string memory attributeName = _arrayAttributeNames.at(i);
-            IDIDRegistry.ArrayAttributeItem[] memory attributeItems = new IDIDRegistry.ArrayAttributeItem[](_arrayAttributes[identifier][attributeName].length);
+            IDIDRegistry.ArrayAttributeItem[] memory attributeItems =
+                new IDIDRegistry.ArrayAttributeItem[](_arrayAttributes[identifier][attributeName].length);
             for (uint256 j = 0; j < _arrayAttributes[identifier][attributeName].length; j++) {
                 attributeItems[j] = _arrayAttributes[identifier][attributeName][j];
             }

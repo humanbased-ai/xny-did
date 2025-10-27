@@ -53,22 +53,13 @@ contract DIDRegistryTest is Test {
     }
 
     function test_initialize_should_fail_with_reinitialing() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Initializable.InvalidInitialization.selector
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
         proxy.initialize(_owner);
     }
 
     function test_updateRegistrars_should_fail_with_caller_not_owner() public {
         vm.prank(_user);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
-                _user
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, _user));
         proxy.updateRegistrars(new address[](0), new address[](0));
     }
 
@@ -92,12 +83,7 @@ contract DIDRegistryTest is Test {
 
     function test_register_should_fail_with_not_registrar() public {
         vm.prank(_owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DIDRegistry.NotRegistrar.selector,
-                _owner
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotRegistrar.selector, _owner));
         proxy.register(DID_IDENTIFIER_0, _owner);
     }
 
@@ -119,25 +105,15 @@ contract DIDRegistryTest is Test {
 
         vm.startPrank(_registrar);
         proxy.register(DID_IDENTIFIER_0, _user);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DIDRegistry.DIDAlreadyRegistered.selector,
-                DID_IDENTIFIER_0,
-                _user
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.DIDAlreadyRegistered.selector, DID_IDENTIFIER_0, _user));
         proxy.register(DID_IDENTIFIER_0, _user);
     }
 
     function test_addItemToAttribute_should_fail_with_not_controller() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DIDRegistry.NotController.selector,
-                DID_IDENTIFIER_0,
-                DID_IDENTIFIER_0
-            )
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.addItemToAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes("")
         );
-        proxy.addItemToAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes(""));
     }
 
     // function test_addItemToAttribute_should_fail_with_caller_not_owner_of_controller() public {
@@ -158,12 +134,7 @@ contract DIDRegistryTest is Test {
         _registerDid();
         vm.startPrank(_user);
         string memory wrongAttributeName = "wrong_name";
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DIDRegistry.NotArrayAttribute.selector,
-                wrongAttributeName
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotArrayAttribute.selector, wrongAttributeName));
         proxy.addItemToAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, wrongAttributeName, bytes(""));
     }
 
@@ -171,16 +142,28 @@ contract DIDRegistryTest is Test {
         _registerDid();
         vm.startPrank(_user);
         vm.expectEmit(true, false, false, true);
-        emit DIDRegistry.DIDAttributeItemAdded(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0, bytes(""));
-        proxy.addItemToAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes(""));
+        emit DIDRegistry.DIDAttributeItemAdded(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0, bytes("")
+        );
+        proxy.addItemToAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes("")
+        );
 
-        (uint256 id, address owner, uint128[] memory controller, IDIDRegistry.KvAttribute[] memory kvAttributes, IDIDRegistry.ArrayAttribute[] memory arrayAttributes) =
-            proxy.getDidDocument(DID_IDENTIFIER_0);
+        (
+            uint256 id,
+            address owner,
+            uint128[] memory controller,
+            IDIDRegistry.KvAttribute[] memory kvAttributes,
+            IDIDRegistry.ArrayAttribute[] memory arrayAttributes
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
         vm.assertEq(id, DID_IDENTIFIER_0);
         vm.assertEq(owner, _user);
         vm.assertEq(controller.length, 0);
-        for (uint256 i = 0; i < arrayAttributes.length; i++){
-            if (keccak256(bytes(arrayAttributes[i].name)) == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION))) {
+        for (uint256 i = 0; i < arrayAttributes.length; i++) {
+            if (
+                keccak256(bytes(arrayAttributes[i].name))
+                    == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION))
+            ) {
                 vm.assertEq(arrayAttributes[i].values.length, 1);
                 vm.assertEq(arrayAttributes[i].values[0].value, bytes(""));
             }

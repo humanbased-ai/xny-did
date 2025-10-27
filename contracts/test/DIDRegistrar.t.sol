@@ -60,17 +60,28 @@ contract DIDRegistrarTest is Test {
         uint128[] memory identifiers = proxy.getOwnedDids(_user);
         vm.assertEq(identifiers.length, 1);
 
-        (uint256 id, address owner, uint128[] memory controller, IDIDRegistry.KvAttribute[] memory kvAttributes, IDIDRegistry.ArrayAttribute[] memory arrayAttributes) =
-            proxy.getDidDocument(identifiers[0]);
+        (
+            uint256 id,
+            address owner,
+            uint128[] memory controller,
+            IDIDRegistry.KvAttribute[] memory kvAttributes,
+            IDIDRegistry.ArrayAttribute[] memory arrayAttributes
+        ) = proxy.getDidDocument(identifiers[0]);
         vm.assertEq(id, identifiers[0]);
         vm.assertEq(owner, _user);
         vm.assertEq(controller.length, 0);
-        for (uint256 i = 0; i < arrayAttributes.length; i++){
-            if (keccak256(bytes(arrayAttributes[i].name)) == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD))) {
+        for (uint256 i = 0; i < arrayAttributes.length; i++) {
+            if (
+                keccak256(bytes(arrayAttributes[i].name))
+                    == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD))
+            ) {
                 vm.assertEq(arrayAttributes[i].values.length, 3);
             }
 
-            if (keccak256(bytes(arrayAttributes[i].name)) == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION))) {
+            if (
+                keccak256(bytes(arrayAttributes[i].name))
+                    == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION))
+            ) {
                 vm.assertEq(arrayAttributes[i].values.length, 3);
             }
         }
