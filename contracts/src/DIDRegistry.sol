@@ -192,7 +192,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
      * @dev Throws if not called by a controller.
      */
     modifier onlyDidController(uint128 identifier, uint128 controller) {
-        if (owner() == _msgSender()) {
+        if ((identifier == controller) && (ownerOf(identifier) == _msgSender())) {
             _;
             return;
         }
@@ -298,6 +298,14 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
         public
         onlyDidController(identifier, operator)
     {
+        if (!_arrayAttributeNames.contains(name)) {
+            revert NotArrayAttribute(name);
+        }
+
+        mapping(string => ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
+        attributes[name].push(ArrayAttributeItem(value, false));
+
+        emit DIDAttributeItemAdded(identifier, operator, name, attributes[name].length - 1, value);
     }
 
     /**

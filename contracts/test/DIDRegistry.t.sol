@@ -6,6 +6,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {DIDRegistry} from "../src/DIDRegistry.sol";
+import {SystemAttribute} from "../src/lib/SystemAttribute.sol";
 
 uint128 constant DID_IDENTIFIER_0 = 0;
 
@@ -15,11 +16,15 @@ contract DIDRegistryTest is Test {
     address internal _owner;
     uint256 internal _ownerKey;
 
+    address internal _registrar;
+    uint256 internal _registrarKey;
+
     address internal _user;
     uint256 internal _userKey;
 
     function setUp() public {
         (_owner, _ownerKey) = makeAddrAndKey("owner");
+        (_registrar, _registrarKey) = makeAddrAndKey("registrar");
         (_user, _userKey) = makeAddrAndKey("user");
         DIDRegistry registry = new DIDRegistry();
         bytes memory initData = abi.encodeWithSelector(DIDRegistry.initialize.selector, _owner);
@@ -27,13 +32,18 @@ contract DIDRegistryTest is Test {
         proxy = DIDRegistry(address(proxy1967));
     }
 
-    function _addRegistrar(address _registrar) internal {
+    function _addRegistrar() internal {
         vm.prank(_owner);
         address[] memory addings = new address[](1);
         addings[0] = _registrar;
         proxy.updateRegistrars(addings, new address[](0));
     }
 
+    function _registerDID() internal {
+        _addRegistrar();
+        vm.prank(_registrar);
+        proxy.register(DID_IDENTIFIER_0, _user);
+    }
 
     function test_initialize_should_pass() public {
         address owner = proxy.owner();
@@ -90,18 +100,18 @@ contract DIDRegistryTest is Test {
     }
 
     function test_register_should_pass_with_called_by_registrar() public {
-        _addRegistrar(_user);
+        _addRegistrar();
 
-        vm.startPrank(_user);
+        vm.startPrank(_registrar);
         vm.expectEmit(true, false, false, true);
         emit DIDRegistry.DIDRegistered(DID_IDENTIFIER_0, _user);
         proxy.register(DID_IDENTIFIER_0, _user);
     }
 
     function test_register_should_fail_with_did_exists() public {
-        _addRegistrar(_user);
+        _addRegistrar();
 
-        vm.startPrank(_user);
+        vm.startPrank(_registrar);
         proxy.register(DID_IDENTIFIER_0, _user);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -113,14 +123,49 @@ contract DIDRegistryTest is Test {
         proxy.register(DID_IDENTIFIER_0, _user);
     }
 
-    // function test_addItemToAttribute_should_fail_with_not_controller() public {
+    function test_addItemToAttribute_should_fail_with_not_controller() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DIDRegistry.NotController.selector,
+                DID_IDENTIFIER_0,
+                DID_IDENTIFIER_0
+            )
+        );
+        proxy.addItemToAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes(""));
+    }
+
+    // function test_addItemToAttribute_should_fail_with_caller_not_owner_of_controller() public {
+    //     _registerDID();
+    //     vm.startPrank(_user);
     //     vm.expectRevert(
     //         abi.encodeWithSelector(
-    //             DIDRegistry.NotController.selector,
+    //             DIDRegistry.NotOwnerOfController.selector,
+    //             DID_IDENTIFIER_0,
     //             DID_IDENTIFIER_0,
     //             _user
     //         )
     //     );
-    //     proxy.register(DID_IDENTIFIER_0, _user);
+    //     proxy.addItemToAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes(""));
     // }
+
+    function test_addItemToAttribute_should_fail_with_attribute_name_error() public {
+        _registerDID();
+        vm.startPrank(_user);
+        string memory wrongAttributeName = "wrong_name";
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DIDRegistry.NotArrayAttribute.selector,
+                wrongAttributeName
+            )
+        );
+        proxy.addItemToAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, wrongAttributeName, bytes(""));
+    }
+
+    function test_addItemToAttribute_should_pass_with_caller_is_owner() public {
+        _registerDID();
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeItemAdded(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0, bytes(""));
+        proxy.addItemToAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes(""));
+    }
 }
