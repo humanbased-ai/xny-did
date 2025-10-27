@@ -168,8 +168,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @dev Throws if called by any account other than the registrar.
      */
     modifier onlyRegistrar() {
-        if (!_registrars.contains(msg.sender)) {
-            revert NotRegistrar(msg.sender);
+        if (!_registrars.contains(_msgSender())) {
+            revert NotRegistrar(_msgSender());
         }
         _;
     }
@@ -188,8 +188,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
             revert NotController(identifier, controller);
         }
 
-        if (_didOwners[controller] != msg.sender) {
-            revert NotOwnerOfController(identifier, controller, msg.sender);
+        if (_didOwners[controller] != _msgSender()) {
+            revert NotOwnerOfController(identifier, controller, _msgSender());
         }
         _;
     }
@@ -198,8 +198,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @dev Throws if not called by a controller.
      */
     modifier onlyDidOwner(uint128 identifier) {
-        if (msg.sender != _didOwners[identifier]) {
-            revert NotDIDOwner(identifier, msg.sender);
+        if (_msgSender() != _didOwners[identifier]) {
+            revert NotDIDOwner(identifier, _msgSender());
         }
         _;
     }
