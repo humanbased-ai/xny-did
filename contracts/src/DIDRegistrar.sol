@@ -3,18 +3,20 @@ pragma solidity ^0.8.13;
 
 import {SystemAttribute} from "./lib/SystemAttribute.sol";
 import {IDIDRegistry} from "./IDIDRegistry.sol";
+import {DIDGenerator} from "./lib/DIDGenerator.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract DIDRegistrar {
     // the contract address of DID registry
     IDIDRegistry _registry;
 
-    constructor() {
-        
+    constructor(address registry) {
+        _registry = IDIDRegistry(registry);
     }
 
     function register() public {
-
+        uint128 identifier = DIDGenerator.generateUUIDv4Uint128();
+        _registry.register(identifier, msg.sender);
     }
 
     /**
@@ -24,7 +26,7 @@ contract DIDRegistrar {
      *  and then convert it to bytes.
      */
     function registerWithAuthorization(bytes[] calldata authorizations) public {
-        uint128 identifier = 120;
+        uint128 identifier = DIDGenerator.generateUUIDv4Uint128();
         _registry.register(identifier, address(this));
 
         for (uint256 i = 0; i < authorizations.length; ++i) {
@@ -34,9 +36,5 @@ contract DIDRegistrar {
         }
 
         _registry.transferOwner(identifier, msg.sender);
-    }
-
-    function setRegistry(address registry) public {
-        _registry = IDIDRegistry(registry);
     }
 }

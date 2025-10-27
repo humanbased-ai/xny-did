@@ -2,26 +2,12 @@
 pragma solidity ^0.8.13;
 
 import {SystemAttribute} from "./lib/SystemAttribute.sol";
+import {IDIDRegistry} from "./IDIDRegistry.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-struct KvAttribute {
-    string name;
-    bytes value;
-}
-
-struct ArrayAttribute {
-    string name;
-    ArrayAttributeItem[] values;
-}
-
-struct ArrayAttributeItem {
-    bytes value;
-    bool revoked;
-}
-
-contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
+contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     // Add the library methods
     using EnumerableSet for EnumerableSet.StringSet;
     using EnumerableSet for EnumerableSet.UintSet;
@@ -45,7 +31,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
     // K-V attributes,
     mapping(uint128 => mapping(string => bytes)) _kvAttributes;
     // array attributes
-    mapping(uint128 => mapping(string => ArrayAttributeItem[])) _arrayAttributes;
+    mapping(uint128 => mapping(string => IDIDRegistry.ArrayAttributeItem[])) _arrayAttributes;
     // custom attribute keys
     mapping(uint128 => EnumerableSet.StringSet) _customAttributeKeys;
 
@@ -302,8 +288,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
             revert NotArrayAttribute(name);
         }
 
-        mapping(string => ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
-        attributes[name].push(ArrayAttributeItem(value, false));
+        mapping(string => IDIDRegistry.ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
+        attributes[name].push(IDIDRegistry.ArrayAttributeItem(value, false));
 
         emit DIDAttributeItemAdded(identifier, operator, name, attributes[name].length - 1, value);
     }
@@ -379,6 +365,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
         emit DIDOwnerChanged(identifier, _didOwners[identifier], to);
 
         _didOwners[identifier] = to;
+        _ownedDids[_msgSender()].remove(identifier);
+        _ownedDids[to].add(identifier);
     }
 
     /**
@@ -417,7 +405,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
         arrayAttributes = new ArrayAttribute[](_arrayAttributeNames.length());
         for (uint256 i = 0; i < _arrayAttributeNames.length(); i++) {
             string memory attributeName = _arrayAttributeNames.at(i);
-            ArrayAttributeItem[] memory attributeItems = new ArrayAttributeItem[](_arrayAttributes[identifier][attributeName].length);
+            IDIDRegistry.ArrayAttributeItem[] memory attributeItems = new IDIDRegistry.ArrayAttributeItem[](_arrayAttributes[identifier][attributeName].length);
             for (uint256 j = 0; j < _arrayAttributes[identifier][attributeName].length; j++) {
                 attributeItems[j] = _arrayAttributes[identifier][attributeName][j];
             }
@@ -431,7 +419,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
      * @return identifiers all did identifiers owner by `account`
      */
     function getOwnedDids(address account) public view returns (uint128[] memory identifiers) {
-        identifiers = new uint128[](0);
+        identifiers = new uint128[](_ownedDids[account].length());
+        for (uint256 i = 0; i < _ownedDids[account].length(); i++) {
+            identifiers[i] = uint128(_ownedDids[account].at(i));
+        }
     }
 
     /**
@@ -441,18 +432,6 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable {
      */
     function ownerOf(uint128 identifier) public view returns (address owner) {
         owner = _didOwners[identifier];
-    }
-
-    /**
-     * @notice Returns dids owned by a user
-     * @param account the account to be queryed
-     * @return identifiers the did identifiers owned by `account`
-     */
-    function ownedDids(address account) public view returns (uint128[] memory identifiers) {
-        identifiers = new uint128[](_ownedDids[account].length());
-        for (uint256 i = 0; i < _ownedDids[account].length(); i++) {
-            identifiers[i] = uint128(_ownedDids[account].at(i));
-        }
     }
 
     /**
