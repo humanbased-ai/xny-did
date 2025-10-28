@@ -1,0 +1,77 @@
+[
+  {
+    "inputs": [
+      {
+        "internalType": "uint128",
+        "name": "identifier",
+        "type": "uint128"
+      }
+    ],
+    "name": "getDidDocument",
+    "outputs": [
+      {
+        "internalType": "uint128",
+        "name": "id",
+        "type": "uint128"
+      },
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      },
+      {
+        "internalType": "uint128[]",
+        "name": "controller",
+        "type": "uint128[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "internalType": "bytes",
+            "name": "value",
+            "type": "bytes"
+          }
+        ],
+        "internalType": "struct IDIDRegistry.KvAttribute[]",
+        "name": "kvAttributes",
+        "type": "tuple[]"
+      },
+      {
+        "components": [
+          {
+            "internalType": "string",
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "components": [
+              {
+                "internalType": "bytes",
+                "name": "value",
+                "type": "bytes"
+              },
+              {
+                "internalType": "bool",
+                "name": "revoked",
+                "type": "bool"
+              }
+            ],
+            "internalType": "struct IDIDRegistry.ArrayAttributeItem[]",
+            "name": "attributeValues",
+            "type": "tuple[]"
+          }
+        ],
+        "internalType": "struct IDIDRegistry.ArrayAttribute[]",
+        "name": "arrayAttributes",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]
