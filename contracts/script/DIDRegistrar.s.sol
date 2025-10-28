@@ -5,7 +5,6 @@ import {Script, console} from "forge-std/Script.sol";
 import {DIDRegistrar} from "../src/DIDRegistrar.sol";
 
 contract DIDRegistrarScript is Script {
-
     DIDRegistrar public registrar;
 
     function setUp() public {}
@@ -27,6 +26,6 @@ contract DIDRegistrarScript is Script {
         if (vm.exists(deployRegistrarPath)) {
             vm.removeFile(deployRegistrarPath);
         }
-        vm.writeFile(deployRegistrarPath, vm.serializeAddress("", "registrar", proxy));
+        vm.writeFile(deployRegistrarPath, vm.serializeAddress("", "registrar", address(registrar)));
     }
 }
