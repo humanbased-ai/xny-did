@@ -24,6 +24,9 @@ class Resolver {
       var identifierUint128 = parseDidToUint128(identifier);
       var document = {};
       var result = await this.contract.getDidDocument(identifierUint128);
+      if (result.owner === ethers.ZeroAddress) {
+        throw new Error(`DID Document not found for identifier: ${identifier}`);
+      }
       document.id = identifier;
       document.owner = result.owner;
       document.controllers = [];
