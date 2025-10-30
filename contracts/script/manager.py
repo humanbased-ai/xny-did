@@ -99,6 +99,9 @@ def ownerOf(args):
 def addRegistrar(args):
     sendTransaction("updateRegistrars", [args.registrar], [])
 
+def transferOwner(args):
+    sendTransaction("transferOwner", args.did, args.owner)
+
 def main():
     parser = argparse.ArgumentParser(
         description="A simple multi-command CLI tool"
@@ -124,10 +127,16 @@ def main():
     parser_echo.add_argument("--did", "-d", type=int, required=True, help="Did identifier")
     parser_echo.set_defaults(func=ownerOf)
 
-    # ===== ownerOf command =====
+    # ===== addRegistrar command =====
     parser_echo = subparsers.add_parser("add", help="Add a registrar")
     parser_echo.add_argument("--registrar", "-r", required=True, help="Registrar contract address")
     parser_echo.set_defaults(func=addRegistrar)
+
+    # ===== transferOwner command =====
+    parser_echo = subparsers.add_parser("transfer", help="Transfer owner")
+    parser_echo.add_argument("--did", "-d", type=int, required=True, help="Did identifier")
+    parser_echo.add_argument("--owner", "-o", required=True, help="Did owner")
+    parser_echo.set_defaults(func=transferOwner)
 
     # ===== parse & dispatch =====
     args = parser.parse_args()
