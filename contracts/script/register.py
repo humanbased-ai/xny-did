@@ -87,8 +87,29 @@ print(
     f"tx hash: {tx_hash.hex()}, block number: {receipt.blockNumber}, gas used: {receipt.gasUsed}"
 )
 
-# events = contract.events.DIDRegistered.processReceipt(receipt)
 
-# for e in events:
-#     print("Event args:", e['args'])
-#     print("Stored data:", e['args']['data'])
+def get_event(event_name, receipt):
+    # Read ABI file
+    current_dir = Path(__file__).parent
+    abi_path = current_dir / "DIDRegistry.json"
+    with abi_path.open("r", encoding="utf-8") as file:
+        abi = json.load(file)
+
+    # Read contract address
+    deployment_path = current_dir / "deploymentRegistry.json"
+    with deployment_path.open("r", encoding="utf-8") as file:
+        contract_address = json.load(file)["proxy"]
+
+    # connect to the blockchain network
+    web3 = Web3(Web3.HTTPProvider(rpc_url))
+
+    # create a contract instance
+    contract = web3.eth.contract(address=contract_address, abi=abi)
+
+    events = contract.events[event_name]().process_receipt(receipt)
+
+    for e in events:
+        print("Event args:", e['args'])
+        print("Stored data:", e['args']['data'])
+
+get_event("DIDRegistered", receipt)
