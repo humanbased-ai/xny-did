@@ -13,8 +13,8 @@ library DIDGenerator {
         // Version (7th byte high 4 bits) = 4
         rand = (rand & 0xFFFFFFFFFFFF0FFF_FFFFFFFFFFFFFFFF) | 0x0000000000004000_0000000000000000;
 
-        // Variant (9th byte high 2 bits) = 10
-        rand = (rand & 0xFFFFFFFFFFFF3FFF_FFFFFFFFFFFFFFFF) | 0x0000000000008000_0000000000000000;
+        // Variant (9th byte high 2 bits) = 8
+        rand = (rand & 0xFFFFFFFFFFFFFFFF_3FFFFFFFFFFFFFFF) | 0x0000000000000000_8000000000000000;
 
         return rand;
     }
