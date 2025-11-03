@@ -96,6 +96,17 @@ def ownerOf(args):
     owner = contract.functions.ownerOf(args.did).call()
     print(args.did, owner)
 
+def implementation(args):
+    # EIP-1967 implementation storage slot
+    slot = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc"
+
+    # 读取存储槽
+    impl_hex = web3.eth.get_storage_at(contract_address, slot)
+
+    # 获取最后 20 字节并转成地址
+    impl_address = Web3.to_checksum_address(impl_hex[-20:])
+    print(impl_address)
+
 def addRegistrar(args):
     sendTransaction("updateRegistrars", [args.registrar], [])
 
@@ -137,6 +148,10 @@ def main():
     parser_echo.add_argument("--did", "-d", type=int, required=True, help="Did identifier")
     parser_echo.add_argument("--owner", "-o", required=True, help="Did owner")
     parser_echo.set_defaults(func=transferOwner)
+
+    # ===== get implementation contract address =====
+    parser_echo = subparsers.add_parser("impl", help="Get implementation contract address")
+    parser_echo.set_defaults(func=implementation)
 
     # ===== parse & dispatch =====
     args = parser.parse_args()
