@@ -4,14 +4,17 @@ pragma solidity ^0.8.13;
 import {SystemAttribute} from "./lib/SystemAttribute.sol";
 import {IDIDRegistry} from "./IDIDRegistry.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     // Add the library methods
     using EnumerableSet for EnumerableSet.StringSet;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
 
     // reserved attributes
     EnumerableSet.StringSet _otherReservedAttributeNames;
@@ -34,6 +37,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     mapping(uint128 => mapping(string => IDIDRegistry.ArrayAttributeItem[])) _arrayAttributes;
     // custom attribute keys
     mapping(uint128 => EnumerableSet.StringSet) _customAttributeKeys;
+    // array attributes index of value
+    mapping(uint128 => mapping(string => EnumerableMap.Bytes32ToUintMap)) _arrayAttributesValueIndex;
 
     /**
      * @dev The caller account is not authorized to perform an operation.
@@ -79,6 +84,11 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @dev The attribute should be an array-type attribute
      */
     error NotArrayAttribute(string name);
+
+    /**
+     * @dev Duplicated array attribute item
+     */
+    error ArrayAttributeItemDuplicated(uint128 identifier, string name, uint256 index, bytes32 valueHash);
 
     /**
      * @dev The specified index does not exist in the array-type attribute
@@ -273,24 +283,53 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
 
     /**
      * @notice Add a child attribute to a array-type attribute of the DID document
-     * @dev Emit the event `DIDAttributeItemAdded` if the call succeeds
+     * NOTE: Only controllers can call the method
      * @param identifier the identifier of the DID to be operated
      * @param operator the DID identifier which perform the operation
      * @param name the attribute name
      * @param value the attribute value
      */
     function addItemToAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
-        public
+        external
         onlyDidController(identifier, operator)
+    {
+        _addItemToAttribute(identifier, operator, name, value);
+    }
+
+/**
+     * @notice Add a child attribute to a array-type attribute of the DID document
+     * @dev Emit the event `DIDAttributeItemAdded` if the call succeeds
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param name the attribute name
+     * @param value the attribute value
+     */
+    function _addItemToAttribute(uint128 identifier, uint128 operator, string memory name, bytes memory value)
+        internal
+        returns (uint256)
     {
         if (!_arrayAttributeNames.contains(name)) {
             revert NotArrayAttribute(name);
         }
 
+        // check duplication
+        bytes32 valueHash = keccak256(value);
+        (bool exists, uint256 index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
+        if (exists) {
+            revert ArrayAttributeItemDuplicated(identifier, name, index, valueHash);
+        }
+
+        // add item
         mapping(string => IDIDRegistry.ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
         attributes[name].push(IDIDRegistry.ArrayAttributeItem(value, false));
 
-        emit DIDAttributeItemAdded(identifier, operator, name, attributes[name].length - 1, value);
+        // record the index of new value
+        index = attributes[name].length - 1;
+        _arrayAttributesValueIndex[identifier][name].set(valueHash, index);
+
+        emit DIDAttributeItemAdded(identifier, operator, name, index, value);
+
+        return index;
     }
 
     /**
@@ -302,6 +341,19 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param index the index of the attribute in the parent attribute
      */
     function revokeItemFromAttribute(uint128 identifier, uint128 operator, string calldata name, uint256 index)
+        public
+        onlyDidController(identifier, operator)
+    {}
+
+    /**
+     * @notice Remove a child attribute from a array-type attribute of the DID document
+     * NOTE: Only controllers can call the method
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param name the attribute name
+     * @param index the index of the attribute in the parent attribute
+     */
+    function _revokeItemFromAttribute(uint128 identifier, uint128 operator, string calldata name, uint256 index)
         public
         onlyDidController(identifier, operator)
     {}
@@ -381,7 +433,17 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function addAuthentication(uint128 identifier, uint128 operator, bytes calldata value)
         public
         onlyDidController(identifier, operator)
-    {}
+    {
+        uint256 index =
+            _addItemToAttribute(identifier, identifier, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value);
+
+        _addItemToAttribute(
+            identifier,
+            identifier,
+            SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION,
+            abi.encodePacked(Strings.toString(index))
+        );
+    }
 
     /**
      * @notice This method allows revoking authorization, including two calls to set properties, which can simplify the calling process.
@@ -392,7 +454,9 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function revokeAuthentication(uint128 identifier, uint128 operator, bytes calldata value)
         public
         onlyDidController(identifier, operator)
-    {}
+    {
+        // _revokeItemFromAttribute(identifier, operator, value);
+    }
 
     /**
      * @notice Check if an array attribute is included
@@ -403,8 +467,16 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @return index the index of the attribute, if the attribute has already been included
      */
     function checkArrayAttribute(uint128 identifier, string calldata name, bytes calldata value)
+        external view
         returns (bool found, uint256 index)
-    {}
+    {
+        if (!_arrayAttributeNames.contains(name)) {
+            revert NotArrayAttribute(name);
+        }
+
+        bytes32 valueHash = keccak256(value);
+        (found, index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
+    }
 
     /**
      * @notice Returns all data of a DID to construct the DID document
