@@ -373,6 +373,40 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     }
 
     /**
+     * @notice This method allows setting authorization, including two calls to set properties, which can simplify the calling process.
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param value the attribute value
+     */
+    function addAuthentication(uint128 identifier, uint128 operator, bytes calldata value)
+        public
+        onlyDidController(identifier, operator)
+    {}
+
+    /**
+     * @notice This method allows revoking authorization, including two calls to set properties, which can simplify the calling process.
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param value the attribute value
+     */
+    function revokeAuthentication(uint128 identifier, uint128 operator, bytes calldata value)
+        public
+        onlyDidController(identifier, operator)
+    {}
+
+    /**
+     * @notice Check if an array attribute is included
+     * @param identifier the identifier of the DID to be queried
+     * @param name the attribute name
+     * @param value the attribute value
+     * @return found is the attribute included
+     * @return index the index of the attribute, if the attribute has already been included
+     */
+    function checkArrayAttribute(uint128 identifier, string calldata name, bytes calldata value)
+        returns (bool found, uint256 index)
+    {}
+
+    /**
      * @notice Returns all data of a DID to construct the DID document
      * @param identifier the identifier of the DID to be operated
      * @return id the identifier of the DID Document
