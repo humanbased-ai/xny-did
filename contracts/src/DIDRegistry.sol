@@ -168,18 +168,26 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @dev Throws if called by any account other than the registrar.
      */
     modifier onlyRegistrar() {
+        _onlyRegistrar();
+        _;
+    }
+
+    function _onlyRegistrar() internal {
         if (!_registrars.contains(_msgSender())) {
             revert NotRegistrar(_msgSender());
         }
-        _;
     }
 
     /**
      * @dev Throws if not called by a controller.
      */
     modifier onlyDidController(uint128 identifier, uint128 controller) {
+        _onlyDidController(identifier, controller);
+        _;
+    }
+
+    function _onlyDidController(uint128 identifier, uint128 controller) internal {
         if ((identifier == controller) && (ownerOf(identifier) == _msgSender())) {
-            _;
             return;
         }
 
@@ -191,17 +199,20 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         if (_didOwners[controller] != _msgSender()) {
             revert NotOwnerOfController(identifier, controller, _msgSender());
         }
-        _;
     }
 
     /**
      * @dev Throws if not called by a controller.
      */
     modifier onlyDidOwner(uint128 identifier) {
+        _onlyDidOwner(identifier);
+        _;
+    }
+
+    function _onlyDidOwner(uint128 identifier) {
         if (_msgSender() != _didOwners[identifier]) {
             revert NotDIDOwner(identifier, _msgSender());
         }
-        _;
     }
 
     /// @custom:oz-upgrades-unsafe-allow constructor
