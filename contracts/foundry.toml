@@ -8,3 +8,4 @@ fs_permissions = [{ access = "read-write", path = "./" }]
 [rpc_endpoints]
 local = "http://127.0.0.1:8545"
 kite_test = "${KITE_TEST_PRC_URL}"
+base = "https://mainnet.base.org"
