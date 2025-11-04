@@ -34,6 +34,18 @@ $ forge test
 $ forge fmt
 ```
 
+### Deploy
+
+```shell
+bash deploy.sh
+```
+
+### Upgrade
+
+```shell
+bash upgrade.sh
+```
+
 ### Contract Call
 
 Enter the directory `script/`
