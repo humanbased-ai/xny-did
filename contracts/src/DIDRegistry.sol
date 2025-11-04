@@ -56,6 +56,11 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     error AlreadyIncludedInController(uint128 identifier, uint128 controller);
 
     /**
+     * @dev Verification method not found
+     */
+    error VerificationMethodNotFound(uint128 identifier, string name, bytes32 valueHash);
+
+    /**
      * @dev The DID identifer has been registered
      */
     error DIDAlreadyRegistered(uint128 identifier, address owner);
@@ -353,7 +358,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param name the attribute name
      * @param index the index of the attribute in the parent attribute
      */
-    function _revokeItemFromAttribute(uint128 identifier, uint128 operator, string calldata name, uint256 index)
+    function _revokeItemFromAttribute(uint128 identifier, uint128 operator, string memory name, uint256 index)
         public
         onlyDidController(identifier, operator)
     {}
@@ -455,7 +460,28 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         public
         onlyDidController(identifier, operator)
     {
-        // _revokeItemFromAttribute(identifier, operator, value);
+        uint256 index = _revokeItemFromAttributeByValue(identifier, operator, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value);
+        _revokeItemFromAttributeByValue(identifier, operator, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, abi.encodePacked(Strings.toString(index)));
+    }
+
+    /**
+     * @notice Revoke an item from array attribute by value
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param name the attribute name to be operated
+     * @param value the attribute value
+     */
+    function _revokeItemFromAttributeByValue(uint128 identifier, uint128 operator, string memory name, bytes memory value) internal returns (uint256 index) {
+        bytes32 valueHash = keccak256(value);
+        (bool found, uint256 index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
+
+        if (!found) {
+            revert VerificationMethodNotFound(identifier, name, valueHash);
+        }
+        
+        _revokeItemFromAttribute(identifier, operator, name, index);
+
+        return index;
     }
 
     /**
