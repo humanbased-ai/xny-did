@@ -209,7 +209,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _;
     }
 
-    function _onlyDidOwner(uint128 identifier) {
+    function _onlyDidOwner(uint128 identifier) internal {
         if (_msgSender() != _didOwners[identifier]) {
             revert NotDIDOwner(identifier, _msgSender());
         }
