@@ -270,7 +270,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param value the attribute value
      */
     function setAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
-        public
+        external
         onlyDidController(identifier, operator)
     {}
 
@@ -282,7 +282,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param name the attribute name to be set
      */
     function revokeAttribute(uint128 identifier, uint128 operator, string calldata name)
-        public
+        external
         onlyDidController(identifier, operator)
     {}
 
@@ -346,7 +346,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param index the index of the attribute in the parent attribute
      */
     function revokeItemFromAttribute(uint128 identifier, uint128 operator, string calldata name, uint256 index)
-        public
+        external
         onlyDidController(identifier, operator)
     {}
 
@@ -359,7 +359,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param index the index of the attribute in the parent attribute
      */
     function _revokeItemFromAttribute(uint128 identifier, uint128 operator, string memory name, uint256 index)
-        public
+        internal
         onlyDidController(identifier, operator)
     {}
 
@@ -372,7 +372,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param value the attribute value
      */
     function setCustomAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
-        public
+        external
         onlyDidController(identifier, operator)
     {}
 
@@ -384,7 +384,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param name the attribute name to be set
      */
     function revokeCustomAttribute(uint128 identifier, uint128 operator, string calldata name)
-        public
+        external
         onlyDidController(identifier, operator)
     {}
 
@@ -399,7 +399,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param controller the new controller identifier
      */
     function addController(uint128 identifier, uint128 operator, uint128 controller)
-        public
+        external
         onlyDidController(identifier, operator)
     {}
 
@@ -411,7 +411,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param controller the controller identifier to be revoked
      */
     function revokeController(uint128 identifier, uint128 operator, uint128 controller)
-        public
+        external
         onlyDidController(identifier, operator)
     {}
 
@@ -421,7 +421,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param identifier the identifier of the DID to be operated
      * @param to the new owner address
      */
-    function transferOwner(uint128 identifier, address to) public onlyDidOwner(identifier) {
+    function transferOwner(uint128 identifier, address to) external onlyDidOwner(identifier) {
         emit DIDOwnerChanged(identifier, _didOwners[identifier], to);
 
         _didOwners[identifier] = to;
@@ -436,7 +436,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param value the attribute value
      */
     function addAuthentication(uint128 identifier, uint128 operator, bytes calldata value)
-        public
+        external
         onlyDidController(identifier, operator)
     {
         uint256 index =
@@ -457,7 +457,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param value the attribute value
      */
     function revokeAuthentication(uint128 identifier, uint128 operator, bytes calldata value)
-        public
+        external
         onlyDidController(identifier, operator)
     {
         uint256 index = _revokeItemFromAttributeByValue(identifier, operator, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value);
@@ -514,7 +514,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @return arrayAttributes
      */
     function getDidDocument(uint128 identifier)
-        public
+        external
         view
         returns (
             uint128 id,
@@ -554,7 +554,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param account the account to be queryed
      * @return identifiers all did identifiers owner by `account`
      */
-    function getOwnedDids(address account) public view returns (uint128[] memory identifiers) {
+    function getOwnedDids(address account) external view returns (uint128[] memory identifiers) {
         identifiers = new uint128[](_ownedDids[account].length());
         for (uint256 i = 0; i < _ownedDids[account].length(); i++) {
             identifiers[i] = uint128(_ownedDids[account].at(i));
@@ -575,7 +575,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param identifier the DID identifier to be queryed
      * @return controllers controllers of a DID
      */
-    function controllersOf(uint128 identifier) public view returns (uint128[] memory controllers) {
+    function controllersOf(uint128 identifier) external view returns (uint128[] memory controllers) {
         controllers = new uint128[](0);
     }
 
@@ -583,7 +583,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @notice Returns the registrar address
      * @return registrars the registrar contract address
      */
-    function getRegistrars() public view returns (address[] memory registrars) {
+    function getRegistrars() external view returns (address[] memory registrars) {
         registrars = _registrars.values();
     }
 
@@ -592,7 +592,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param addings new registrars to add
      * @param removings registrars to remove
      */
-    function updateRegistrars(address[] calldata addings, address[] calldata removings) public onlyOwner {
+    function updateRegistrars(address[] calldata addings, address[] calldata removings) external onlyOwner {
         for (uint256 i = 0; i < addings.length; i++) {
             _registrars.add(addings[i]);
         }
