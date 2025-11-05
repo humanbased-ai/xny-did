@@ -1,11 +1,9 @@
 import os
 import json
-import rfc8785
 from web3 import Web3
 from eth_abi import encode
 from dotenv import load_dotenv
 from pathlib import Path
-import time
 from web3.middleware import ExtraDataToPOAMiddleware
 import argparse
 import sys
