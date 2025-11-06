@@ -1,5 +1,4 @@
-const MAX_UINT_128 = 2n ** 128n - 1n;
-
+const uuid = require('uuid');
 /**
  * Parse the string in the format "did:codatta:ID"
  * It will verify the prefix and ensure that the ID is a valid uint128.
@@ -7,7 +6,7 @@ const MAX_UINT_128 = 2n ** 128n - 1n;
  * @returns {string} If validation passes, returns the ID string (e.g. "38564")
  * @throws {Error} If the format is invalid or the ID is out of range, throws an exception
  */
-function parseDidToUint128(didString) {
+function toBigInt(didString) {
   if (!didString || typeof didString !== 'string') {
     throw new Error('Input must be a non-empty string.');
   }
@@ -28,33 +27,30 @@ function parseDidToUint128(didString) {
 
   const idString = parts[2];
 
-  const isNumericString = /^\d+$/.test(idString);
-  if (!isNumericString) {
+  const isValidUUID = uuid.validate(idString);
+  if (!isValidUUID) {
     throw new Error(
-      `The ID is partially invalid. It should be an unsigned integer, but what was received is '${idString}'`
+      `The ID is partially invalid. It should be a valid UUID, but what was received is '${idString}'`
     );
   }
   if (idString.length === 0) {
     throw new Error('The ID field cannot be empty.');
   }
-  let numericId;
-  try {
-    numericId = BigInt(idString);
-  } catch (e) {
-    throw new Error(
-      `Cannot convert ID '${idString}' to a number: ${e.message}`
-    );
-  }
 
-  if (numericId > MAX_UINT_128) {
-    throw new Error(
-      `ID exceeds the range. '${idString}' is greater than the maximum value of uint128.`
-    );
-  }
-
-  return idString;
+  const hex = idString.replace(/-/g, '');
+  return BigInt('0x' + hex);
 }
 
+function fromBigInt(num) {
+  let hex = num.toString(16);
+  hex = hex.padStart(32, '0');
+  const uuid = hex.replace(
+    /(\w{8})(\w{4})(\w{4})(\w{4})(\w{12})/,
+    '$1-$2-$3-$4-$5'
+  );
+  return 'did:codatta:' + uuid;
+}
 module.exports = {
-  parseDidToUint128,
+  toBigInt,
+  fromBigInt,
 };

@@ -1,6 +1,6 @@
 const ethers = require('ethers');
 const config = require('config');
-const { parseDidToUint128 } = require('../utils/parseDidToUint128');
+const { toBigInt, fromBigInt } = require('../utils/did-parser');
 
 class Resolver {
   /**
@@ -21,7 +21,7 @@ class Resolver {
    */
   async resolve(identifier) {
     try {
-      var identifierUint128 = parseDidToUint128(identifier);
+      var identifierUint128 = toBigInt(identifier);
       var document = {};
       var result = await this.contract.getDidDocument(identifierUint128);
       if (result.owner === ethers.ZeroAddress) {
@@ -31,7 +31,7 @@ class Resolver {
       document.owner = result.owner;
       document.controllers = [];
       for (const controller of result.controller) { 
-        document.controllers.push('did:codata:' + controller);
+        document.controllers.push(fromBigInt(controller));
       }
       var attributes = this.parseAttributes(result);
       Object.assign(document, attributes);
