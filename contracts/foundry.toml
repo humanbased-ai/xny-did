@@ -12,3 +12,6 @@ via_ir = true
 local = "http://127.0.0.1:8545"
 kite_test = "${KITE_TEST_PRC_URL}"
 base = "https://mainnet.base.org"
+
+[lint]
+exclude_lints = ["asm-keccak256", "unsafe-cheatcode"]
