@@ -283,7 +283,16 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function setAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
         external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (!_kvAttributeNames.contains(name)) {
+            revert NotKvAttribute(name);
+        }
+
+        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
+        attributes[name] = value;
+
+        emit DIDAttributeSet(identifier, operator, name, value);
+    }
 
     /**
      * @notice Remove an K-V attribute from a DID document
@@ -295,7 +304,17 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function revokeAttribute(uint128 identifier, uint128 operator, string calldata name)
         external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (!_kvAttributeNames.contains(name)) {
+            revert NotKvAttribute(name);
+        }
+
+        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
+
+        emit DIDAttributeRevoked(identifier, operator, name, attributes[name]);
+
+        delete attributes[name];
+    }
 
     /**
      * @notice Add a child attribute to a array-type attribute of the DID document
@@ -359,7 +378,9 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function revokeItemFromAttribute(uint128 identifier, uint128 operator, string calldata name, uint256 index)
         external
         onlyDidController(identifier, operator)
-    {}
+    {
+        _revokeItemFromAttribute(identifier, operator, name, index);
+    }
 
     /**
      * @notice Remove a child attribute from a array-type attribute of the DID document
@@ -372,7 +393,21 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function _revokeItemFromAttribute(uint128 identifier, uint128 operator, string memory name, uint256 index)
         internal
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (!_arrayAttributeNames.contains(name)) {
+            revert NotArrayAttribute(name);
+        }
+
+        mapping(string => ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
+
+        if (index > attributes[name].length - 1) {
+            revert AttributeIndexNotExist(identifier, name, index);
+        }
+
+        attributes[name][index].revoked = true;
+
+        emit DIDAttributeItemRevoked(identifier, operator, name, index, attributes[name][index].value);
+    }
 
     /**
      * @notice Set a custom K-V attribute to a DID document.
@@ -385,7 +420,17 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function setCustomAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
         external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (_kvAttributeNames.contains(name) || _arrayAttributeNames.contains(name) || _otherReservedAttributeNames.contains(name)) {
+            revert ReservedAttribute(name);
+        }
+
+        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
+        attributes[name] = value;
+        _customAttributeKeys[identifier].add(name);
+
+        emit DIDAttributeSet(identifier, operator, name, value);
+    }
 
     /**
      * @notice Remove a custom K-V attribute from a DID document
@@ -397,7 +442,18 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function revokeCustomAttribute(uint128 identifier, uint128 operator, string calldata name)
         external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (_kvAttributeNames.contains(name) || _arrayAttributeNames.contains(name) || _otherReservedAttributeNames.contains(name)) {
+            revert ReservedAttribute(name);
+        }
+
+        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
+        _customAttributeKeys[identifier].remove(name);
+
+        emit DIDAttributeRevoked(identifier, operator, name, attributes[name]);
+
+        delete attributes[name];
+    }
 
     /**
      * @notice Add a controller to the DID document.
@@ -556,7 +612,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
             for (uint256 j = 0; j < _arrayAttributes[identifier][attributeName].length; j++) {
                 attributeItems[j] = _arrayAttributes[identifier][attributeName][j];
             }
-            arrayAttributes[i] = ArrayAttribute(attributeName, attributeItems);
+            arrayAttributes[i] = ArrayAttribute({name: attributeName, values: attributeItems});
         }
     }
 
