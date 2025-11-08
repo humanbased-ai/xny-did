@@ -187,7 +187,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _;
     }
 
-    function _onlyRegistrar() internal {
+    function _onlyRegistrar() internal view {
         if (!_registrars.contains(_msgSender())) {
             revert NotRegistrar(_msgSender());
         }
@@ -201,7 +201,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _;
     }
 
-    function _onlyDidController(uint128 identifier, uint128 controller) internal {
+    function _onlyDidController(uint128 identifier, uint128 controller) internal view {
         if ((identifier == controller) && (ownerOf(identifier) == _msgSender())) {
             return;
         }
@@ -224,7 +224,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _;
     }
 
-    function _onlyDidOwner(uint128 identifier) internal {
+    function _onlyDidOwner(uint128 identifier) internal view {
         if (_msgSender() != _didOwners[identifier]) {
             revert NotDIDOwner(identifier, _msgSender());
         }
@@ -468,7 +468,20 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function addController(uint128 identifier, uint128 operator, uint128 controller)
         external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (identifier == controller) {
+            revert AlreadyIncludedInController(identifier, controller);
+        }
+
+        EnumerableSet.UintSet storage controllers = _didControllers[identifier];
+        if (controllers.contains(controller)) {
+            revert AlreadyIncludedInController(identifier, controller);
+        }
+
+        controllers.add(controller);
+
+        emit DIDControllerAdded(identifier, operator, controller);
+    }
 
     /**
      * @notice Remove a controller from the DID document.
@@ -480,7 +493,16 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     function revokeController(uint128 identifier, uint128 operator, uint128 controller)
         external
         onlyDidController(identifier, operator)
-    {}
+    {
+        EnumerableSet.UintSet storage controllers = _didControllers[identifier];
+        if (!controllers.contains(controller)) {
+            revert ControllerNotFound(identifier, controller);
+        }
+
+        controllers.remove(controller);
+
+        emit DIDControllerRevoked(identifier, operator, controller);
+    }
 
     /**
      * @notice Transfer the owner of a DID to a new account.
@@ -537,18 +559,19 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param operator the DID identifier which perform the operation
      * @param name the attribute name to be operated
      * @param value the attribute value
+     * @return index the index of the removed item
      */
     function _revokeItemFromAttributeByValue(uint128 identifier, uint128 operator, string memory name, bytes memory value) internal returns (uint256 index) {
         bytes32 valueHash = keccak256(value);
-        (bool found, uint256 index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
+        (bool found, uint256 _index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
 
         if (!found) {
             revert VerificationMethodNotFound(identifier, name, valueHash);
         }
         
-        _revokeItemFromAttribute(identifier, operator, name, index);
+        _revokeItemFromAttribute(identifier, operator, name, _index);
 
-        return index;
+        index = _index;
     }
 
     /**
@@ -643,7 +666,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @return controllers controllers of a DID
      */
     function controllersOf(uint128 identifier) external view returns (uint128[] memory controllers) {
-        controllers = new uint128[](0);
+        uint256[] memory controllerValues = _didControllers[identifier].values();
+        for (uint256 i = 0; i < controllerValues.length; i++) {
+            controllers[i] = uint128(controllerValues[i]);
+        }
     }
 
     /**

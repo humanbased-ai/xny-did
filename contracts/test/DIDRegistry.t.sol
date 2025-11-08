@@ -47,7 +47,7 @@ contract DIDRegistryTest is Test {
         proxy.register(DID_IDENTIFIER_0, _user);
     }
 
-    function test_initialize_should_pass() public {
+    function test_initialize_should_pass() public view {
         address owner = proxy.owner();
         vm.assertEq(owner, _owner);
     }
