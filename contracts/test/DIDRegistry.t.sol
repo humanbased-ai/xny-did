@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {DIDRegistryForTest, KV_ATTRIBUTE_NAME} from "./DIDRegistryTest.sol";
 import {DIDRegistry} from "../src/DIDRegistry.sol";
 import {IDIDRegistry} from "../src/IDIDRegistry.sol";
 import {SystemAttribute} from "../src/lib/SystemAttribute.sol";
@@ -12,7 +13,7 @@ import {SystemAttribute} from "../src/lib/SystemAttribute.sol";
 uint128 constant DID_IDENTIFIER_0 = 0;
 
 contract DIDRegistryTest is Test {
-    DIDRegistry public proxy;
+    DIDRegistryForTest public proxy;
 
     address internal _owner;
     uint256 internal _ownerKey;
@@ -28,10 +29,10 @@ contract DIDRegistryTest is Test {
         (_registrar, _registrarKey) = makeAddrAndKey("registrar");
         (_user, _userKey) = makeAddrAndKey("user");
 
-        DIDRegistry registry = new DIDRegistry();
+        DIDRegistryForTest registry = new DIDRegistryForTest();
         bytes memory initData = abi.encodeWithSelector(DIDRegistry.initialize.selector, _owner);
         ERC1967Proxy proxy1967 = new ERC1967Proxy(address(registry), initData);
-        proxy = DIDRegistry(address(proxy1967));
+        proxy = DIDRegistryForTest(address(proxy1967));
     }
 
     function _addRegistrar() internal {
@@ -107,6 +108,35 @@ contract DIDRegistryTest is Test {
         proxy.register(DID_IDENTIFIER_0, _user);
         vm.expectRevert(abi.encodeWithSelector(DIDRegistry.DIDAlreadyRegistered.selector, DID_IDENTIFIER_0, _user));
         proxy.register(DID_IDENTIFIER_0, _user);
+    }
+
+    function test_setAttribute_should_revert_with_not_controller() public {
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.setAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes("")
+        );
+    }
+
+    function test_setAttribute_should_revert_not_system_attribute_name() public {
+        _registerDid();
+        vm.startPrank(_user);
+        string memory illegalName = "illegal_name";
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotKvAttribute.selector, illegalName));
+        proxy.setAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, illegalName, bytes("")
+        );
+    }
+
+    function test_setAttribute_should_pass() public {
+        _registerDid();
+        vm.startPrank(_user);
+        proxy.addKvAttributeNames();
+        emit DIDRegistry.DIDAttributeSet(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("")
+        );
+        proxy.setAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("")
+        );
     }
 
     function test_addItemToAttribute_should_fail_with_not_controller() public {
