@@ -392,7 +392,6 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      */
     function _revokeItemFromAttribute(uint128 identifier, uint128 operator, string memory name, uint256 index)
         internal
-        onlyDidController(identifier, operator)
     {
         if (!_arrayAttributeNames.contains(name)) {
             revert NotArrayAttribute(name);
@@ -400,7 +399,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
 
         mapping(string => ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
 
-        if (index > attributes[name].length - 1) {
+        if (index >= attributes[name].length) {
             revert AttributeIndexNotExist(identifier, name, index);
         }
 

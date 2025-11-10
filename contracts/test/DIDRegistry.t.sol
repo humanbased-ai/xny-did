@@ -131,6 +131,7 @@ contract DIDRegistryTest is Test {
         _registerDid();
         vm.startPrank(_user);
         proxy.addKvAttributeNames();
+        vm.expectEmit(true, false, false, true);
         emit DIDRegistry.DIDAttributeSet(
             DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
         );
@@ -171,6 +172,7 @@ contract DIDRegistryTest is Test {
         _registerDid();
         vm.startPrank(_user);
         proxy.addKvAttributeNames();
+        vm.expectEmit(true, false, false, true);
         emit DIDRegistry.DIDAttributeSet(
             DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
         );
@@ -178,6 +180,7 @@ contract DIDRegistryTest is Test {
             DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
         );
         
+        vm.expectEmit(true, false, false, true);
         emit DIDRegistry.DIDAttributeRevoked(
             DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
         );
@@ -231,17 +234,17 @@ contract DIDRegistryTest is Test {
         vm.startPrank(_user);
         vm.expectEmit(true, false, false, true);
         emit DIDRegistry.DIDAttributeItemAdded(
-            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0, bytes("")
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0, bytes("array")
         );
         proxy.addItemToAttribute(
-            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes("")
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes("array")
         );
 
         (
             uint256 id,
             address owner,
             uint128[] memory controller,
-            IDIDRegistry.KvAttribute[] memory kvAttributes,
+            ,
             IDIDRegistry.ArrayAttribute[] memory arrayAttributes
         ) = proxy.getDidDocument(DID_IDENTIFIER_0);
         vm.assertEq(id, DID_IDENTIFIER_0);
@@ -253,7 +256,72 @@ contract DIDRegistryTest is Test {
                     == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION))
             ) {
                 vm.assertEq(arrayAttributes[i].values.length, 1);
-                vm.assertEq(arrayAttributes[i].values[0].value, bytes(""));
+                vm.assertEq(arrayAttributes[i].values[0].value, bytes("array"));
+                vm.assertEq(arrayAttributes[i].values[0].revoked, false);
+            }
+        }
+    }
+
+    function test_revokeItemFromAttribute_should_revert_with_not_controller() public {
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.revokeItemFromAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0
+        );
+    }
+
+    function test_revokeItemFromAttribute_should_revert_with_not_system_array_attribute_name() public {
+        _registerDid();
+        vm.startPrank(_user);
+        string memory illegalName = "illegal_name";
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotArrayAttribute.selector, illegalName));
+        proxy.revokeItemFromAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, illegalName, 0
+        );
+    }
+
+    function test_revokeItemFromAttribute_should_revert_with_index_not_exist() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.AttributeIndexNotExist.selector, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 10));
+        proxy.revokeItemFromAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 10
+        );
+    }
+
+    function test_revokeItemFromAttribute() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeItemAdded(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0, bytes("array")
+        );
+        proxy.addItemToAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes("array")
+        );
+        
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeItemRevoked(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0, bytes("array")
+        );
+        proxy.revokeItemFromAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, 0
+        );
+
+        (
+            ,
+            ,
+            ,
+            ,
+            IDIDRegistry.ArrayAttribute[] memory arrayAttributes
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        for (uint256 i = 0; i < arrayAttributes.length; i++) {
+            if (
+                keccak256(bytes(arrayAttributes[i].name))
+                    == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION))
+            ) {
+                vm.assertEq(arrayAttributes[i].values.length, 1);
+                vm.assertEq(arrayAttributes[i].values[0].value, bytes("array"));
+                vm.assertEq(arrayAttributes[i].values[0].revoked, true);
             }
         }
     }
