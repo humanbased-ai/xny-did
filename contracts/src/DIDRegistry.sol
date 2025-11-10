@@ -51,6 +51,11 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     error NotDIDOwner(uint128 identifier, address sender);
 
     /**
+     * @dev The DID not exists
+     */
+    error DIDNotExists(uint128 identifier);
+
+    /**
      * @dev The did identifier has been included in controller
      */
     error AlreadyIncludedInController(uint128 identifier, uint128 controller);
@@ -468,6 +473,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         external
         onlyDidController(identifier, operator)
     {
+        if (ownerOf(controller) == address(0)) {
+            revert DIDNotExists(controller);
+        }
+
         if (identifier == controller) {
             revert AlreadyIncludedInController(identifier, controller);
         }

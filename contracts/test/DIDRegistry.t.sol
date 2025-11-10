@@ -11,6 +11,7 @@ import {IDIDRegistry} from "../src/IDIDRegistry.sol";
 import {SystemAttribute} from "../src/lib/SystemAttribute.sol";
 
 uint128 constant DID_IDENTIFIER_0 = 0;
+uint128 constant DID_IDENTIFIER_1 = 1;
 
 contract DIDRegistryTest is Test {
     DIDRegistryForTest public proxy;
@@ -46,6 +47,12 @@ contract DIDRegistryTest is Test {
         _addRegistrar();
         vm.prank(_registrar);
         proxy.register(DID_IDENTIFIER_0, _user);
+    }
+
+    function _registerDid(uint128 identifier) internal {
+        _addRegistrar();
+        vm.prank(_registrar);
+        proxy.register(identifier, _user);
     }
 
     function test_initialize_should_pass() public view {
@@ -324,5 +331,153 @@ contract DIDRegistryTest is Test {
                 vm.assertEq(arrayAttributes[i].values[0].revoked, true);
             }
         }
+    }
+
+    function test_setCustomAttribute_should_revert_with_not_controller() public {
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.setCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, bytes("")
+        );
+    }
+
+    function test_setCustomAttribute_should_revert_with_system_attribute_name() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.ReservedAttribute.selector, SystemAttribute.RESERVE_ID));
+        proxy.setCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.RESERVE_ID, bytes("")
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.ReservedAttribute.selector, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD));
+        proxy.setCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, bytes("")
+        );
+    }
+
+    function test_setCustomAttribute_should_pass() public {
+        string memory customAttributeName = "custom";
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeSet(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, customAttributeName, bytes("custom")
+        );
+        proxy.setCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, customAttributeName, bytes("custom")
+        );
+
+        (
+            ,
+            ,
+            ,
+            IDIDRegistry.KvAttribute[] memory kvAttributes,
+            
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        vm.assertEq(kvAttributes.length, 1);
+        vm.assertEq(kvAttributes[0].name, customAttributeName);
+        vm.assertEq(kvAttributes[0].value, bytes("custom"));
+    }
+
+    function test_revokeCustomAttribute_should_revert_with_not_controller() public {
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.revokeCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION
+        );
+    }
+
+    function test_revokeCustomAttribute_should_revert_with_system_attribute_name() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.ReservedAttribute.selector, SystemAttribute.RESERVE_ID));
+        proxy.revokeCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.RESERVE_ID
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.ReservedAttribute.selector, SystemAttribute.ARRAY_ATTRIBUTE_SERVICE));
+        proxy.revokeCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_SERVICE
+        );
+    }
+
+    function test_revokeCustomAttribute() public {
+        string memory customAttributeName = "custom";
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeSet(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, customAttributeName, bytes("custom")
+        );
+        proxy.setCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, customAttributeName, bytes("custom")
+        );
+        
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeRevoked(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, customAttributeName, bytes("custom")
+        );
+        proxy.revokeCustomAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, customAttributeName
+        );
+
+        (
+            ,
+            ,
+            ,
+            IDIDRegistry.KvAttribute[] memory kvAttributes,
+            
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        vm.assertEq(kvAttributes.length, 0);
+    }
+
+    function test_addController_should_revert_with_not_controller() public {
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.addController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_0
+        );
+    }
+
+    function test_addController_should_revert_with_controller_not_exist() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.DIDNotExists.selector, DID_IDENTIFIER_1));
+        proxy.addController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+    }
+
+    function test_addController() public {
+        _registerDid(DID_IDENTIFIER_0);
+        _registerDid(DID_IDENTIFIER_1);
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDControllerAdded(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+        proxy.addController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+    }
+
+    function test_addController_should_revert_with_controller_duplicated() public {
+        _registerDid(DID_IDENTIFIER_0);
+        vm.prank(_user);
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.AlreadyIncludedInController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.addController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_0
+        );
+        
+        _registerDid(DID_IDENTIFIER_1);
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDControllerAdded(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+        proxy.addController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.AlreadyIncludedInController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_1));
+        proxy.addController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
     }
 }
