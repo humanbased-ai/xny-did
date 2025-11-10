@@ -117,7 +117,7 @@ contract DIDRegistryTest is Test {
         );
     }
 
-    function test_setAttribute_should_revert_not_system_attribute_name() public {
+    function test_setAttribute_should_revert_with_not_system_kv_attribute_name() public {
         _registerDid();
         vm.startPrank(_user);
         string memory illegalName = "illegal_name";
@@ -132,11 +132,69 @@ contract DIDRegistryTest is Test {
         vm.startPrank(_user);
         proxy.addKvAttributeNames();
         emit DIDRegistry.DIDAttributeSet(
-            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("")
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
         );
         proxy.setAttribute(
-            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("")
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
         );
+
+        (
+            ,
+            ,
+            ,
+            IDIDRegistry.KvAttribute[] memory kvAttributes,
+            
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        vm.assertEq(kvAttributes.length, 1);
+        vm.assertEq(kvAttributes[0].name, KV_ATTRIBUTE_NAME);
+        vm.assertEq(kvAttributes[0].value, bytes("kv"));
+    }
+
+    function test_revokeAttribute_should_revert_with_not_controller() public {
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.revokeAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION
+        );
+    }
+
+    function test_revokeAttribute_should_revert_with_not_system_kv_attribute_name() public {
+        _registerDid();
+        vm.startPrank(_user);
+        string memory illegalName = "illegal_name";
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotKvAttribute.selector, illegalName));
+        proxy.revokeAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, illegalName
+        );
+    }
+
+    function test_revokeAttribute() public {
+        _registerDid();
+        vm.startPrank(_user);
+        proxy.addKvAttributeNames();
+        emit DIDRegistry.DIDAttributeSet(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
+        );
+        proxy.setAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
+        );
+        
+        emit DIDRegistry.DIDAttributeRevoked(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME, bytes("kv")
+        );
+        proxy.revokeAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, KV_ATTRIBUTE_NAME
+        );
+
+        (
+            ,
+            ,
+            ,
+            IDIDRegistry.KvAttribute[] memory kvAttributes,
+            
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        vm.assertEq(kvAttributes.length, 1);
+        vm.assertEq(kvAttributes[0].name, KV_ATTRIBUTE_NAME);
+        vm.assertEq(kvAttributes[0].value, bytes(""));
     }
 
     function test_addItemToAttribute_should_fail_with_not_controller() public {

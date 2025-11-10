@@ -625,7 +625,17 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
             controller[i] = uint128(controllerValues[i]);
         }
         // kv attribute
-        kvAttributes = new KvAttribute[](_kvAttributeNames.length());
+        uint256 kvAttributeLength = _kvAttributeNames.length();
+        kvAttributes = new KvAttribute[](kvAttributeLength + _customAttributeKeys[identifier].length());
+        for (uint256 i = 0; i < kvAttributeLength; i++) {
+            string memory attributeName = _kvAttributeNames.at(i);
+            kvAttributes[i] = KvAttribute({name: attributeName, value: _kvAttributes[identifier][attributeName]});
+        }
+
+        for (uint256 i = kvAttributeLength; i < kvAttributeLength + _customAttributeKeys[identifier].length(); i++) {
+            string memory attributeName = _customAttributeKeys[identifier].at(i - kvAttributeLength);
+            kvAttributes[i] = KvAttribute({name: attributeName, value: _kvAttributes[identifier][attributeName]});
+        }
         // array attribute
         arrayAttributes = new ArrayAttribute[](_arrayAttributeNames.length());
         for (uint256 i = 0; i < _arrayAttributeNames.length(); i++) {
