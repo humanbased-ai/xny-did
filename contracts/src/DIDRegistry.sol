@@ -409,6 +409,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         }
 
         attributes[name][index].revoked = true;
+        bytes32 valueHash = keccak256(attributes[name][index].value);
+        _arrayAttributesValueIndex[identifier][name].remove(valueHash);
 
         emit DIDAttributeItemRevoked(identifier, operator, name, index, attributes[name][index].value);
     }
@@ -685,6 +687,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      */
     function controllersOf(uint128 identifier) external view returns (uint128[] memory controllers) {
         uint256[] memory controllerValues = _didControllers[identifier].values();
+        controllers = new uint128[](controllerValues.length);
         for (uint256 i = 0; i < controllerValues.length; i++) {
             controllers[i] = uint128(controllerValues[i]);
         }

@@ -456,6 +456,18 @@ contract DIDRegistryTest is Test {
         proxy.addController(
             DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
         );
+
+        (
+            ,
+            ,
+            uint128[] memory controller,
+            ,
+            
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        vm.assertEq(controller.length, 1);
+
+        uint128[] memory cs = proxy.controllersOf(DID_IDENTIFIER_0);
+        vm.assertEq(cs.length, 1);
     }
 
     function test_addController_should_revert_with_controller_duplicated() public {
@@ -479,5 +491,148 @@ contract DIDRegistryTest is Test {
         proxy.addController(
             DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
         );
+    }
+
+    function test_revokeController_should_revert_with_not_controller() public {
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotController.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_0));
+        proxy.revokeController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_0
+        );
+    }
+
+    function test_revokeController_should_revert_with_controller_not_found() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.ControllerNotFound.selector, DID_IDENTIFIER_0, DID_IDENTIFIER_1));
+        proxy.revokeController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+    }
+
+    function test_revokeController() public {
+        _registerDid(DID_IDENTIFIER_0);
+        _registerDid(DID_IDENTIFIER_1);
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDControllerAdded(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+        proxy.addController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDControllerRevoked(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+        proxy.revokeController(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, DID_IDENTIFIER_1
+        );
+
+        (
+            ,
+            ,
+            uint128[] memory controller,
+            ,
+            
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        vm.assertEq(controller.length, 0);
+    }
+
+    function test_transferOwner_should_revert_with_caller_not_did_owner() public {
+        vm.startPrank(_user);
+        vm.expectRevert(abi.encodeWithSelector(DIDRegistry.NotDIDOwner.selector, DID_IDENTIFIER_0, _user));
+        proxy.transferOwner(
+            DID_IDENTIFIER_0, _user
+        );
+    }
+
+    function test_transferOwner() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDOwnerChanged(
+            DID_IDENTIFIER_0, _user, _owner
+        );
+        proxy.transferOwner(
+            DID_IDENTIFIER_0, _owner
+        );
+
+        (
+            ,
+            address owner,
+            ,
+            ,
+            
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        vm.assertEq(owner, _owner);
+
+        uint128[] memory dids = proxy.getOwnedDids(_user);
+        vm.assertEq(dids.length, 0);
+        dids = proxy.getOwnedDids(_owner);
+        vm.assertEq(dids.length, 1);
+    }
+
+    function test_addAuthentication() public {
+        _registerDid();
+        vm.startPrank(_user);
+        proxy.addAuthentication(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, bytes("authentication")
+        );
+
+        (
+            ,
+            ,
+            ,
+            ,
+            IDIDRegistry.ArrayAttribute[] memory arrayAttributes
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        for (uint256 i = 0; i < arrayAttributes.length; i++) {
+            if (
+                keccak256(bytes(arrayAttributes[i].name))
+                    == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD))
+            ) {
+                vm.assertEq(arrayAttributes[i].values.length, 1);
+                vm.assertEq(arrayAttributes[i].values[0].value, bytes("authentication"));
+                vm.assertEq(arrayAttributes[i].values[0].revoked, false);
+            }
+        }
+
+        (bool found, uint256 index) = proxy.checkArrayAttribute(DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, bytes("authentication"));
+        vm.assertEq(found, true);
+        vm.assertEq(index, 0);
+    }
+
+    function test_revokeAuthentication() public {
+        _registerDid();
+        vm.startPrank(_user);
+        proxy.addAuthentication(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, bytes("authentication")
+        );
+        proxy.revokeAuthentication(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, bytes("authentication")
+        );
+
+        (
+            ,
+            ,
+            ,
+            ,
+            IDIDRegistry.ArrayAttribute[] memory arrayAttributes
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        for (uint256 i = 0; i < arrayAttributes.length; i++) {
+            if (
+                keccak256(bytes(arrayAttributes[i].name))
+                    == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD))
+            ) {
+                vm.assertEq(arrayAttributes[i].values.length, 1);
+                vm.assertEq(arrayAttributes[i].values[0].value, bytes("authentication"));
+                vm.assertEq(arrayAttributes[i].values[0].revoked, true);
+            }
+        }
+
+        (bool found, uint256 index) = proxy.checkArrayAttribute(DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, bytes("authentication"));
+        vm.assertEq(found, false);
+        vm.assertEq(index, 0);
     }
 }
