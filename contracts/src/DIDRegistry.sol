@@ -336,7 +336,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _addItemToAttribute(identifier, operator, name, value);
     }
 
-/**
+    /**
      * @notice Add a child attribute to a array-type attribute of the DID document
      * @dev Emit the event `DIDAttributeItemAdded` if the call succeeds
      * @param identifier the identifier of the DID to be operated
@@ -427,7 +427,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         external
         onlyDidController(identifier, operator)
     {
-        if (_kvAttributeNames.contains(name) || _arrayAttributeNames.contains(name) || _otherReservedAttributeNames.contains(name)) {
+        if (
+            _kvAttributeNames.contains(name) || _arrayAttributeNames.contains(name)
+                || _otherReservedAttributeNames.contains(name)
+        ) {
             revert ReservedAttribute(name);
         }
 
@@ -449,7 +452,10 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         external
         onlyDidController(identifier, operator)
     {
-        if (_kvAttributeNames.contains(name) || _arrayAttributeNames.contains(name) || _otherReservedAttributeNames.contains(name)) {
+        if (
+            _kvAttributeNames.contains(name) || _arrayAttributeNames.contains(name)
+                || _otherReservedAttributeNames.contains(name)
+        ) {
             revert ReservedAttribute(name);
         }
 
@@ -538,8 +544,9 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         external
         onlyDidController(identifier, operator)
     {
-        uint256 index =
-            _addItemToAttribute(identifier, identifier, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value);
+        uint256 index = _addItemToAttribute(
+            identifier, identifier, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value
+        );
 
         _addItemToAttribute(
             identifier,
@@ -559,8 +566,15 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         external
         onlyDidController(identifier, operator)
     {
-        uint256 index = _revokeItemFromAttributeByValue(identifier, operator, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value);
-        _revokeItemFromAttributeByValue(identifier, operator, SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION, abi.encodePacked(Strings.toString(index)));
+        uint256 index = _revokeItemFromAttributeByValue(
+            identifier, operator, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value
+        );
+        _revokeItemFromAttributeByValue(
+            identifier,
+            operator,
+            SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION,
+            abi.encodePacked(Strings.toString(index))
+        );
     }
 
     /**
@@ -571,14 +585,19 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param value the attribute value
      * @return index the index of the removed item
      */
-    function _revokeItemFromAttributeByValue(uint128 identifier, uint128 operator, string memory name, bytes memory value) internal returns (uint256 index) {
+    function _revokeItemFromAttributeByValue(
+        uint128 identifier,
+        uint128 operator,
+        string memory name,
+        bytes memory value
+    ) internal returns (uint256 index) {
         bytes32 valueHash = keccak256(value);
         (bool found, uint256 _index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
 
         if (!found) {
             revert VerificationMethodNotFound(identifier, name, valueHash);
         }
-        
+
         _revokeItemFromAttribute(identifier, operator, name, _index);
 
         index = _index;
@@ -593,7 +612,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @return index the index of the attribute, if the attribute has already been included
      */
     function checkArrayAttribute(uint128 identifier, string calldata name, bytes calldata value)
-        external view
+        external
+        view
         returns (bool found, uint256 index)
     {
         if (!_arrayAttributeNames.contains(name)) {
