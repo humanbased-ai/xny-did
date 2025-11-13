@@ -4,14 +4,17 @@ pragma solidity ^0.8.13;
 import {SystemAttribute} from "./lib/SystemAttribute.sol";
 import {IDIDRegistry} from "./IDIDRegistry.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     // Add the library methods
     using EnumerableSet for EnumerableSet.StringSet;
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableMap for EnumerableMap.Bytes32ToUintMap;
 
     // reserved attributes
     EnumerableSet.StringSet _otherReservedAttributeNames;
@@ -34,6 +37,8 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     mapping(uint128 => mapping(string => IDIDRegistry.ArrayAttributeItem[])) _arrayAttributes;
     // custom attribute keys
     mapping(uint128 => EnumerableSet.StringSet) _customAttributeKeys;
+    // array attributes index of value
+    mapping(uint128 => mapping(string => EnumerableMap.Bytes32ToUintMap)) _arrayAttributesValueIndex;
 
     /**
      * @dev The caller account is not authorized to perform an operation.
@@ -46,9 +51,19 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
     error NotDIDOwner(uint128 identifier, address sender);
 
     /**
+     * @dev The DID not exists
+     */
+    error DIDNotExists(uint128 identifier);
+
+    /**
      * @dev The did identifier has been included in controller
      */
     error AlreadyIncludedInController(uint128 identifier, uint128 controller);
+
+    /**
+     * @dev Verification method not found
+     */
+    error VerificationMethodNotFound(uint128 identifier, string name, bytes32 valueHash);
 
     /**
      * @dev The DID identifer has been registered
@@ -79,6 +94,11 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @dev The attribute should be an array-type attribute
      */
     error NotArrayAttribute(string name);
+
+    /**
+     * @dev Duplicated array attribute item
+     */
+    error ArrayAttributeItemDuplicated(uint128 identifier, string name, uint256 index, bytes32 valueHash);
 
     /**
      * @dev The specified index does not exist in the array-type attribute
@@ -172,7 +192,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _;
     }
 
-    function _onlyRegistrar() internal {
+    function _onlyRegistrar() internal view {
         if (!_registrars.contains(_msgSender())) {
             revert NotRegistrar(_msgSender());
         }
@@ -186,7 +206,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _;
     }
 
-    function _onlyDidController(uint128 identifier, uint128 controller) internal {
+    function _onlyDidController(uint128 identifier, uint128 controller) internal view {
         if ((identifier == controller) && (ownerOf(identifier) == _msgSender())) {
             return;
         }
@@ -209,7 +229,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _;
     }
 
-    function _onlyDidOwner(uint128 identifier) internal {
+    function _onlyDidOwner(uint128 identifier) internal view {
         if (_msgSender() != _didOwners[identifier]) {
             revert NotDIDOwner(identifier, _msgSender());
         }
@@ -266,9 +286,18 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param value the attribute value
      */
     function setAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
-        public
+        external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (!_kvAttributeNames.contains(name)) {
+            revert NotKvAttribute(name);
+        }
+
+        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
+        attributes[name] = value;
+
+        emit DIDAttributeSet(identifier, operator, name, value);
+    }
 
     /**
      * @notice Remove an K-V attribute from a DID document
@@ -278,9 +307,34 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param name the attribute name to be set
      */
     function revokeAttribute(uint128 identifier, uint128 operator, string calldata name)
-        public
+        external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (!_kvAttributeNames.contains(name)) {
+            revert NotKvAttribute(name);
+        }
+
+        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
+
+        emit DIDAttributeRevoked(identifier, operator, name, attributes[name]);
+
+        delete attributes[name];
+    }
+
+    /**
+     * @notice Add a child attribute to a array-type attribute of the DID document
+     * NOTE: Only controllers can call the method
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param name the attribute name
+     * @param value the attribute value
+     */
+    function addItemToAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
+        external
+        onlyDidController(identifier, operator)
+    {
+        _addItemToAttribute(identifier, operator, name, value);
+    }
 
     /**
      * @notice Add a child attribute to a array-type attribute of the DID document
@@ -290,18 +344,32 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param name the attribute name
      * @param value the attribute value
      */
-    function addItemToAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
-        public
-        onlyDidController(identifier, operator)
+    function _addItemToAttribute(uint128 identifier, uint128 operator, string memory name, bytes memory value)
+        internal
+        returns (uint256)
     {
         if (!_arrayAttributeNames.contains(name)) {
             revert NotArrayAttribute(name);
         }
 
+        // check duplication
+        bytes32 valueHash = keccak256(value);
+        (bool exists, uint256 index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
+        if (exists) {
+            revert ArrayAttributeItemDuplicated(identifier, name, index, valueHash);
+        }
+
+        // add item
         mapping(string => IDIDRegistry.ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
         attributes[name].push(IDIDRegistry.ArrayAttributeItem(value, false));
 
-        emit DIDAttributeItemAdded(identifier, operator, name, attributes[name].length - 1, value);
+        // record the index of new value
+        index = attributes[name].length - 1;
+        _arrayAttributesValueIndex[identifier][name].set(valueHash, index);
+
+        emit DIDAttributeItemAdded(identifier, operator, name, index, value);
+
+        return index;
     }
 
     /**
@@ -313,9 +381,39 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param index the index of the attribute in the parent attribute
      */
     function revokeItemFromAttribute(uint128 identifier, uint128 operator, string calldata name, uint256 index)
-        public
+        external
         onlyDidController(identifier, operator)
-    {}
+    {
+        _revokeItemFromAttribute(identifier, operator, name, index);
+    }
+
+    /**
+     * @notice Remove a child attribute from a array-type attribute of the DID document
+     * NOTE: Only controllers can call the method
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param name the attribute name
+     * @param index the index of the attribute in the parent attribute
+     */
+    function _revokeItemFromAttribute(uint128 identifier, uint128 operator, string memory name, uint256 index)
+        internal
+    {
+        if (!_arrayAttributeNames.contains(name)) {
+            revert NotArrayAttribute(name);
+        }
+
+        mapping(string => ArrayAttributeItem[]) storage attributes = _arrayAttributes[identifier];
+
+        if (index >= attributes[name].length) {
+            revert AttributeIndexNotExist(identifier, name, index);
+        }
+
+        attributes[name][index].revoked = true;
+        bytes32 valueHash = keccak256(attributes[name][index].value);
+        _arrayAttributesValueIndex[identifier][name].remove(valueHash);
+
+        emit DIDAttributeItemRevoked(identifier, operator, name, index, attributes[name][index].value);
+    }
 
     /**
      * @notice Set a custom K-V attribute to a DID document.
@@ -326,9 +424,22 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param value the attribute value
      */
     function setCustomAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
-        public
+        external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (
+            _kvAttributeNames.contains(name) || _arrayAttributeNames.contains(name)
+                || _otherReservedAttributeNames.contains(name)
+        ) {
+            revert ReservedAttribute(name);
+        }
+
+        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
+        attributes[name] = value;
+        _customAttributeKeys[identifier].add(name);
+
+        emit DIDAttributeSet(identifier, operator, name, value);
+    }
 
     /**
      * @notice Remove a custom K-V attribute from a DID document
@@ -338,9 +449,23 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param name the attribute name to be set
      */
     function revokeCustomAttribute(uint128 identifier, uint128 operator, string calldata name)
-        public
+        external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (
+            _kvAttributeNames.contains(name) || _arrayAttributeNames.contains(name)
+                || _otherReservedAttributeNames.contains(name)
+        ) {
+            revert ReservedAttribute(name);
+        }
+
+        mapping(string => bytes) storage attributes = _kvAttributes[identifier];
+        _customAttributeKeys[identifier].remove(name);
+
+        emit DIDAttributeRevoked(identifier, operator, name, attributes[name]);
+
+        delete attributes[name];
+    }
 
     /**
      * @notice Add a controller to the DID document.
@@ -353,9 +478,26 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param controller the new controller identifier
      */
     function addController(uint128 identifier, uint128 operator, uint128 controller)
-        public
+        external
         onlyDidController(identifier, operator)
-    {}
+    {
+        if (ownerOf(controller) == address(0)) {
+            revert DIDNotExists(controller);
+        }
+
+        if (identifier == controller) {
+            revert AlreadyIncludedInController(identifier, controller);
+        }
+
+        EnumerableSet.UintSet storage controllers = _didControllers[identifier];
+        if (controllers.contains(controller)) {
+            revert AlreadyIncludedInController(identifier, controller);
+        }
+
+        controllers.add(controller);
+
+        emit DIDControllerAdded(identifier, operator, controller);
+    }
 
     /**
      * @notice Remove a controller from the DID document.
@@ -365,9 +507,18 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param controller the controller identifier to be revoked
      */
     function revokeController(uint128 identifier, uint128 operator, uint128 controller)
-        public
+        external
         onlyDidController(identifier, operator)
-    {}
+    {
+        EnumerableSet.UintSet storage controllers = _didControllers[identifier];
+        if (!controllers.contains(controller)) {
+            revert ControllerNotFound(identifier, controller);
+        }
+
+        controllers.remove(controller);
+
+        emit DIDControllerRevoked(identifier, operator, controller);
+    }
 
     /**
      * @notice Transfer the owner of a DID to a new account.
@@ -375,12 +526,102 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param identifier the identifier of the DID to be operated
      * @param to the new owner address
      */
-    function transferOwner(uint128 identifier, address to) public onlyDidOwner(identifier) {
+    function transferOwner(uint128 identifier, address to) external onlyDidOwner(identifier) {
         emit DIDOwnerChanged(identifier, _didOwners[identifier], to);
 
         _didOwners[identifier] = to;
         _ownedDids[_msgSender()].remove(identifier);
         _ownedDids[to].add(identifier);
+    }
+
+    /**
+     * @notice This method allows setting authorization, including two calls to set properties, which can simplify the calling process.
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param value the attribute value
+     */
+    function addAuthentication(uint128 identifier, uint128 operator, bytes calldata value)
+        external
+        onlyDidController(identifier, operator)
+    {
+        uint256 index = _addItemToAttribute(
+            identifier, identifier, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value
+        );
+
+        _addItemToAttribute(
+            identifier,
+            identifier,
+            SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION,
+            abi.encodePacked(Strings.toString(index))
+        );
+    }
+
+    /**
+     * @notice This method allows revoking authorization, including two calls to set properties, which can simplify the calling process.
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param value the attribute value
+     */
+    function revokeAuthentication(uint128 identifier, uint128 operator, bytes calldata value)
+        external
+        onlyDidController(identifier, operator)
+    {
+        uint256 index = _revokeItemFromAttributeByValue(
+            identifier, operator, SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD, value
+        );
+        _revokeItemFromAttributeByValue(
+            identifier,
+            operator,
+            SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION,
+            abi.encodePacked(Strings.toString(index))
+        );
+    }
+
+    /**
+     * @notice Revoke an item from array attribute by value
+     * @param identifier the identifier of the DID to be operated
+     * @param operator the DID identifier which perform the operation
+     * @param name the attribute name to be operated
+     * @param value the attribute value
+     * @return index the index of the removed item
+     */
+    function _revokeItemFromAttributeByValue(
+        uint128 identifier,
+        uint128 operator,
+        string memory name,
+        bytes memory value
+    ) internal returns (uint256 index) {
+        bytes32 valueHash = keccak256(value);
+        (bool found, uint256 _index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
+
+        if (!found) {
+            revert VerificationMethodNotFound(identifier, name, valueHash);
+        }
+
+        _revokeItemFromAttribute(identifier, operator, name, _index);
+
+        index = _index;
+    }
+
+    /**
+     * @notice Check if an array attribute is included
+     * @param identifier the identifier of the DID to be queried
+     * @param name the attribute name
+     * @param value the attribute value
+     * @return found is the attribute included
+     * @return index the index of the attribute, if the attribute has already been included
+     */
+    function checkArrayAttribute(uint128 identifier, string calldata name, bytes calldata value)
+        external
+        view
+        returns (bool found, uint256 index)
+    {
+        if (!_arrayAttributeNames.contains(name)) {
+            revert NotArrayAttribute(name);
+        }
+
+        bytes32 valueHash = keccak256(value);
+        (found, index) = _arrayAttributesValueIndex[identifier][name].tryGet(valueHash);
     }
 
     /**
@@ -393,7 +634,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @return arrayAttributes
      */
     function getDidDocument(uint128 identifier)
-        public
+        external
         view
         returns (
             uint128 id,
@@ -414,7 +655,17 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
             controller[i] = uint128(controllerValues[i]);
         }
         // kv attribute
-        kvAttributes = new KvAttribute[](_kvAttributeNames.length());
+        uint256 kvAttributeLength = _kvAttributeNames.length();
+        kvAttributes = new KvAttribute[](kvAttributeLength + _customAttributeKeys[identifier].length());
+        for (uint256 i = 0; i < kvAttributeLength; i++) {
+            string memory attributeName = _kvAttributeNames.at(i);
+            kvAttributes[i] = KvAttribute({name: attributeName, value: _kvAttributes[identifier][attributeName]});
+        }
+
+        for (uint256 i = kvAttributeLength; i < kvAttributeLength + _customAttributeKeys[identifier].length(); i++) {
+            string memory attributeName = _customAttributeKeys[identifier].at(i - kvAttributeLength);
+            kvAttributes[i] = KvAttribute({name: attributeName, value: _kvAttributes[identifier][attributeName]});
+        }
         // array attribute
         arrayAttributes = new ArrayAttribute[](_arrayAttributeNames.length());
         for (uint256 i = 0; i < _arrayAttributeNames.length(); i++) {
@@ -424,7 +675,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
             for (uint256 j = 0; j < _arrayAttributes[identifier][attributeName].length; j++) {
                 attributeItems[j] = _arrayAttributes[identifier][attributeName][j];
             }
-            arrayAttributes[i] = ArrayAttribute(attributeName, attributeItems);
+            arrayAttributes[i] = ArrayAttribute({name: attributeName, values: attributeItems});
         }
     }
 
@@ -433,7 +684,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param account the account to be queryed
      * @return identifiers all did identifiers owner by `account`
      */
-    function getOwnedDids(address account) public view returns (uint128[] memory identifiers) {
+    function getOwnedDids(address account) external view returns (uint128[] memory identifiers) {
         identifiers = new uint128[](_ownedDids[account].length());
         for (uint256 i = 0; i < _ownedDids[account].length(); i++) {
             identifiers[i] = uint128(_ownedDids[account].at(i));
@@ -454,15 +705,19 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param identifier the DID identifier to be queryed
      * @return controllers controllers of a DID
      */
-    function controllersOf(uint128 identifier) public view returns (uint128[] memory controllers) {
-        controllers = new uint128[](0);
+    function controllersOf(uint128 identifier) external view returns (uint128[] memory controllers) {
+        uint256[] memory controllerValues = _didControllers[identifier].values();
+        controllers = new uint128[](controllerValues.length);
+        for (uint256 i = 0; i < controllerValues.length; i++) {
+            controllers[i] = uint128(controllerValues[i]);
+        }
     }
 
     /**
      * @notice Returns the registrar address
      * @return registrars the registrar contract address
      */
-    function getRegistrars() public view returns (address[] memory registrars) {
+    function getRegistrars() external view returns (address[] memory registrars) {
         registrars = _registrars.values();
     }
 
@@ -471,7 +726,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
      * @param addings new registrars to add
      * @param removings registrars to remove
      */
-    function updateRegistrars(address[] calldata addings, address[] calldata removings) public onlyOwner {
+    function updateRegistrars(address[] calldata addings, address[] calldata removings) external onlyOwner {
         for (uint256 i = 0; i < addings.length; i++) {
             _registrars.add(addings[i]);
         }

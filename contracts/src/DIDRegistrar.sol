@@ -37,7 +37,7 @@ contract DIDRegistrar {
                 identifier,
                 identifier,
                 SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION,
-                abi.encodePacked(Strings.toString(uint256(identifier)), "#", Strings.toString(i))
+                abi.encodePacked(Strings.toString(i))
             );
         }
 
