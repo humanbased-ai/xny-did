@@ -250,6 +250,7 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _otherReservedAttributeNames.add(SystemAttribute.RESERVE_OWNER);
         _otherReservedAttributeNames.add(SystemAttribute.RESERVE_CONTROLLER);
 
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT);
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD);
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_ALSO_KNOW_AS);
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION);
