@@ -517,4 +517,62 @@ contract DIDRegistryTest is Test {
         vm.assertEq(found, false);
         vm.assertEq(index, 0);
     }
+
+    function test_addContext() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeItemAdded(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, 0, bytes("context")
+        );
+        proxy.addItemToAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, bytes("context")
+        );
+
+        (
+            uint256 id,
+            address owner,
+            uint128[] memory controller,,
+            IDIDRegistry.ArrayAttribute[] memory arrayAttributes
+        ) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        vm.assertEq(id, DID_IDENTIFIER_0);
+        vm.assertEq(owner, _user);
+        vm.assertEq(controller.length, 0);
+        for (uint256 i = 0; i < arrayAttributes.length; i++) {
+            if (keccak256(bytes(arrayAttributes[i].name)) == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT)))
+            {
+                vm.assertEq(arrayAttributes[i].values.length, 1);
+                vm.assertEq(arrayAttributes[i].values[0].value, bytes("context"));
+                vm.assertEq(arrayAttributes[i].values[0].revoked, false);
+            }
+        }
+    }
+
+    function test_revokeContext() public {
+        _registerDid();
+        vm.startPrank(_user);
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeItemAdded(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, 0, bytes("context")
+        );
+        proxy.addItemToAttribute(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, bytes("context")
+        );
+
+        vm.expectEmit(true, false, false, true);
+        emit DIDRegistry.DIDAttributeItemRevoked(
+            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, 0, bytes("context")
+        );
+        proxy.revokeItemFromAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, 0);
+
+        (,,,, IDIDRegistry.ArrayAttribute[] memory arrayAttributes) = proxy.getDidDocument(DID_IDENTIFIER_0);
+        for (uint256 i = 0; i < arrayAttributes.length; i++) {
+            if (keccak256(bytes(arrayAttributes[i].name)) == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT)))
+            {
+                vm.assertEq(arrayAttributes[i].values.length, 1);
+                vm.assertEq(arrayAttributes[i].values[0].value, bytes("context"));
+                vm.assertEq(arrayAttributes[i].values[0].revoked, true);
+            }
+        }
+    }
 }

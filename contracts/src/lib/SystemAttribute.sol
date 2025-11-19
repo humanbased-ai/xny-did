@@ -6,6 +6,7 @@ library SystemAttribute {
     string constant RESERVE_OWNER = "owner";
     string constant RESERVE_CONTROLLER = "controller";
 
+    string constant ARRAY_ATTRIBUTE_CONTEXT = "@context";
     string constant ARRAY_ATTRIBUTE_VERIFICATION_METHOD = "verificationMethod";
     string constant ARRAY_ATTRIBUTE_ALSO_KNOW_AS = "alsoKnownAs";
     string constant ARRAY_ATTRIBUTE_AUTHENTICATION = "authentication";
