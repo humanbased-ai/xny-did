@@ -26,7 +26,7 @@ contract UpgradeScript is Script {
 
         vm.stopBroadcast();
     }
-    
+
     function upgradeToV2() public {
         string memory root = vm.projectRoot();
         string memory deployRegistryPath = string.concat(root, "/script/deploymentRegistry.json");
