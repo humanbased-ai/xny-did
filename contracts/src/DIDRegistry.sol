@@ -250,7 +250,6 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _otherReservedAttributeNames.add(SystemAttribute.RESERVE_OWNER);
         _otherReservedAttributeNames.add(SystemAttribute.RESERVE_CONTROLLER);
 
-        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT);
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_VERIFICATION_METHOD);
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_ALSO_KNOW_AS);
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_AUTHENTICATION);
@@ -259,6 +258,13 @@ contract DIDRegistry is UUPSUpgradeable, OwnableUpgradeable, IDIDRegistry {
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_CAPABILITY_INVOCATION);
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_CAPABILITY_DELEGATION);
         _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_SERVICE);
+
+        // initialization code for V2
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT);
+    }
+
+    function initializeV2() public reinitializer(2) {
+        _arrayAttributeNames.add(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT);
     }
 
     /**
