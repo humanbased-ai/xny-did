@@ -539,10 +539,8 @@ contract DIDRegistryTest is Test {
         vm.assertEq(owner, _user);
         vm.assertEq(controller.length, 0);
         for (uint256 i = 0; i < arrayAttributes.length; i++) {
-            if (
-                keccak256(bytes(arrayAttributes[i].name))
-                    == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT))
-            ) {
+            if (keccak256(bytes(arrayAttributes[i].name)) == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT)))
+            {
                 vm.assertEq(arrayAttributes[i].values.length, 1);
                 vm.assertEq(arrayAttributes[i].values[0].value, bytes("context"));
                 vm.assertEq(arrayAttributes[i].values[0].revoked, false);
@@ -565,16 +563,12 @@ contract DIDRegistryTest is Test {
         emit DIDRegistry.DIDAttributeItemRevoked(
             DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, 0, bytes("context")
         );
-        proxy.revokeItemFromAttribute(
-            DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, 0
-        );
+        proxy.revokeItemFromAttribute(DID_IDENTIFIER_0, DID_IDENTIFIER_0, SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT, 0);
 
         (,,,, IDIDRegistry.ArrayAttribute[] memory arrayAttributes) = proxy.getDidDocument(DID_IDENTIFIER_0);
         for (uint256 i = 0; i < arrayAttributes.length; i++) {
-            if (
-                keccak256(bytes(arrayAttributes[i].name))
-                    == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT))
-            ) {
+            if (keccak256(bytes(arrayAttributes[i].name)) == keccak256(bytes(SystemAttribute.ARRAY_ATTRIBUTE_CONTEXT)))
+            {
                 vm.assertEq(arrayAttributes[i].values.length, 1);
                 vm.assertEq(arrayAttributes[i].values[0].value, bytes("context"));
                 vm.assertEq(arrayAttributes[i].values[0].revoked, true);
