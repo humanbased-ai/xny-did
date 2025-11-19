@@ -85,4 +85,9 @@ There are several commands available
     owner               Get the owner of a did
     add                 Add a registrar
     transfer            Transfer owner
+    additem             Add item to array attribute
+    revokeitem          Revoke item from array attribute
+    addauth             Add authentication
+    revokeauth          Revoke authentication
+    impl                Get implementation contract address
 ```
