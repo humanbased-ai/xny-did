@@ -26,17 +26,17 @@ load_dotenv()
 private_key = os.getenv("USER_PRIVATE_KEY")
 rpc_url = os.getenv("KITE_TEST_PRC_URL")
 
-print(private_key)
-print(contract_address)
-print(rpc_url)
+# print(private_key)
+print("contract_address", contract_address)
+print("rpc_url", rpc_url)
 
 # Check if the environment variables are set
 assert private_key and contract_address and rpc_url, "check your .env file"
 
 # connect to the blockchain network
 web3 = Web3(Web3.HTTPProvider(rpc_url))
-print("connected:", web3.is_connected())
-print("chain_id:", web3.eth.chain_id)
+# print("connected:", web3.is_connected())
+# print("chain_id:", web3.eth.chain_id)
 
 # create a contract instance
 contract = web3.eth.contract(address=contract_address, abi=abi)
