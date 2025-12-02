@@ -6,30 +6,27 @@ import {
   beforeAll,
   afterAll
 } from "matchstick-as/assembly/index"
-import { BigInt, Bytes, Address } from "@graphprotocol/graph-ts"
-import { DIDAttributeItemAdded } from "../generated/schema"
+import { BigInt, Bytes, Address, log } from "@graphprotocol/graph-ts"
 import { DIDAttributeItemAdded as DIDAttributeItemAddedEvent } from "../generated/DIDRegistry/DIDRegistry"
-import { handleDIDAttributeItemAdded } from "../src/did-registry"
-import { createDIDAttributeItemAddedEvent } from "./did-registry-utils"
+import { handleDIDAttributeItemAdded, handleDIDRegistered } from "../src/did-registry"
+import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent } from "./did-registry-utils"
+import { uint128ToDID } from "../src/utils"
+import { DIDDocument } from "../generated/schema"
 
 // Tests structure (matchstick-as >=0.5.0)
 // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#tests-structure
 
+const identifier = BigInt.fromI32(234)
+const did = uint128ToDID(identifier)
+const owner = Address.fromBytes(Bytes.fromHexString("0x3db6B0550FBB3f84CD71859f2B5b16BA1a0fA67a"))
+
 describe("Describe entity assertions", () => {
   beforeAll(() => {
-    let identifier = BigInt.fromI32(234)
-    let operator = BigInt.fromI32(234)
-    let name = "Example string value"
-    let index = BigInt.fromI32(234)
-    let value = Bytes.fromI32(1234567890)
-    let newDIDAttributeItemAddedEvent = createDIDAttributeItemAddedEvent(
+    let newDIDRegisteredEvent = createDIDRegisteredEvent(
       identifier,
-      operator,
-      name,
-      index,
-      value
+      owner
     )
-    handleDIDAttributeItemAdded(newDIDAttributeItemAddedEvent)
+    handleDIDRegistered(newDIDRegisteredEvent)
   })
 
   afterAll(() => {
@@ -39,42 +36,17 @@ describe("Describe entity assertions", () => {
   // For more test scenarios, see:
   // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#write-a-unit-test
 
-  test("DIDAttributeItemAdded created and stored", () => {
-    assert.entityCount("DIDAttributeItemAdded", 1)
+  test("DIDRegistred created and stored", () => {
+    assert.entityCount("DIDDocument", 1)
 
-    // 0xa16081f360e3847006db660bae1c6d1b2e17ec2a is the default address used in newMockEvent() function
     assert.fieldEquals(
-      "DIDAttributeItemAdded",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
-      "identifier",
-      "234"
+      "DIDDocument",
+      did,
+      "owner",
+      owner.toHexString()
     )
-    assert.fieldEquals(
-      "DIDAttributeItemAdded",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
-      "operator",
-      "234"
-    )
-    assert.fieldEquals(
-      "DIDAttributeItemAdded",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
-      "name",
-      "Example string value"
-    )
-    assert.fieldEquals(
-      "DIDAttributeItemAdded",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
-      "index",
-      "234"
-    )
-    assert.fieldEquals(
-      "DIDAttributeItemAdded",
-      "0xa16081f360e3847006db660bae1c6d1b2e17ec2a-1",
-      "value",
-      "1234567890"
-    )
-
-    // More assert options:
-    // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#asserts
+    let document = DIDDocument.load(did);
+    assert.assertNotNull(document, "document should not be null");
+    assert.assertTrue(document!.controller.length == 1, "controller length not 1");
   })
 })
