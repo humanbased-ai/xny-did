@@ -1,4 +1,4 @@
-import { BigInt } from "@graphprotocol/graph-ts";
+import { BigInt, Entity, JSONValue } from "@graphprotocol/graph-ts";
 
 export function uint128ToUUID(value: BigInt): string {
     // 定义 128 位最大值 (2^128 - 1)
