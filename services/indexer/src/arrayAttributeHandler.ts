@@ -1,29 +1,28 @@
-import { json, JSONValue, JSONValueKind, log, BigInt, Bytes, Entity, store } from "@graphprotocol/graph-ts";
+import { json, JSONValue, JSONValueKind, log, BigInt, Bytes, Entity, store, ValueKind } from "@graphprotocol/graph-ts";
 import {ArrayAttributes} from "./constants";
-import {SingleMethod, VerificationMethod} from "../generated/schema";
+import {Authentication, SingleMethod, VerificationMethod, Service, CapabilityDelegation, CapabilityInvocation, KeyAgreement, AssertionMethod} from "../generated/schema";
 import * as utils from "./utils";
 
 export class ArrayAttributeHandler {
-    static addArrayAttibuteEntity(did: string, name: string, index: string, value: Bytes): Entity | null {
+    static addArrayAttibuteEntity(did: string, name: string, index: string, value: Bytes): void {
         if (name == ArrayAttributes.VERIFICATION_METHOD) {
-            return newVerificationMethod(did, name, index, value);
+            addVerificationMethod(did, index, value);
         } else if (name == ArrayAttributes.AUTHENTICATION) {
-
+            addAuthentication(did, index, value)
         } else if (name == ArrayAttributes.ASSERTION_METHOD) {
-
+            addAssertionMethod(did, index, value)
         } else if (name == ArrayAttributes.KEY_AGREEMENT) {
-
+            addKeyAgreement(did, index, value)
         } else if (name == ArrayAttributes.CAPABILITY_INVOCATION) {
-
+            addCapabilityInvocation(did, index, value)
         } else if (name == ArrayAttributes.CAPABILITY_DELEGATION) {
-
+            addCapabilityDelegation(did, index, value)
         } else if (name == ArrayAttributes.SERVICE) {
-
+            addService(did, index, value)
         }
-        return null;
     }
 
-    static removeArrayAttributeEntity(did: string, name: string, index: string) {
+    static removeArrayAttributeEntity(did: string, name: string, index: string): void {
         if (name == ArrayAttributes.VERIFICATION_METHOD) {
             let id = `${did}#vm_${index}`
             store.remove("VerificationMethod", id);
@@ -43,17 +42,13 @@ export class ArrayAttributeHandler {
             let id = `${did}#cd_${index}`
             store.remove("CapabilityDelegation", id);
         } else if (name == ArrayAttributes.SERVICE) {
-            // let id = `${did}#auth_${index}`
-            // store.remove("Service", id);
+            let id = `${did}#service_${index}`
+            store.remove("Service", id);
         }
     }
 }
 
-function newContext(did: string, name: string, value: Bytes): Entity {
-    // let entity = new 
-}
-
-function newVerificationMethod(did: string, name: string, index: string, value: Bytes): Entity | null {
+function addSingleMethod(did: string, parentType: string, index: string, value: Bytes): SingleMethod | null {
     // parse value
     let jsonValue = json.fromString(value.toString())
     if (jsonValue.isNull()) {
@@ -108,42 +103,182 @@ function newVerificationMethod(did: string, name: string, index: string, value: 
     
     let id = `${did}#vm_${index}`
 
-    let entity = new VerificationMethod(id);
     let method = new SingleMethod(id);
     method.controller = controllerValue;
     method.type = typeValue;
     method.value = value.toString();
     method.parentId = id;
-    method.parentType = "VerificationMethod";
-    entity.method = id;
+    method.parentType = parentType;
 
-    return entity;
+    method.save()
+
+    return method
 }
 
-// function newAlsoKnownAs(did: string, name: string, value: Bytes) {
+function addVerificationMethod(did: string, index: string, value: Bytes): void {
+    let method = addSingleMethod(did, "VerificationMethod", index, value)
 
-// }
+    if (method == null) {
+        return;
+    }
 
-// function newAuthentication(did: string, name: string, value: Bytes) {
+    let entity = new VerificationMethod(method.id);
+    entity.method = method.id;
 
-// }
+    return;
+}
 
-// function newAssertionMethod(did: string, name: string, value: Bytes) {
+class AuthParam {
+    id: string;
+    uri: string | null;
+    method: string | null;
+}
 
-// }
+function getAuthParams(did: string, name: string, authPrefix: string, index: string, value: Bytes): AuthParam | null {
+    // parse value
+    let jsonValue = json.fromString(value.toString())
+    if (jsonValue.isNull()) {
+        log.warning("can not parse value {} as json", [value.toHexString()])
+        return null;
+    }
 
-// function newKeyAgreement(did: string, name: string, value: Bytes) {
+    let id = `${did}#${authPrefix}_${index}`
+    // if string, it should be a did
+    if (jsonValue.kind == JSONValueKind.STRING) {
+        let stringValue = jsonValue.toString()
+        if (!utils.isValidDID(stringValue)) {
+            log.error("not a valid did: {}", [stringValue])
+            return null;
+        }
 
-// }
+        return {id, uri: stringValue, method: null}
+    } else if (jsonValue.kind == JSONValueKind.OBJECT) {
+        let method = addSingleMethod(did, name, index, value)
 
-// function newCapabilityInvocation(did: string, name: string, value: Bytes) {
+        if (method == null) {
+            return null;
+        }
 
-// }
+        return {id, uri: null, method: method.id}
+    } else {
+        log.error("json value type error: {}", [jsonValue.kind.toString()])
+        return null;
+    }
+}
 
-// function newCapabilityDelegation(did: string, name: string, value: Bytes) {
+function addAuthentication(did: string, index: string, value: Bytes): void {
+    let params = getAuthParams(did, "authentication", "auth", index, value)
+    if (!params) {
+        return
+    }
 
-// }
+    let entity = new Authentication(params.id);
+    entity.didDoc = did;
+    entity.uri = params.uri;
+    entity.method = params.method;
 
-// function newService(did: string, name: string, value: Bytes) {
+    entity.save()
+}
+
+function addAssertionMethod(did: string, index: string, value: Bytes): void {
+    let params = getAuthParams(did, "assertionMethod", "am", index, value)
+    if (!params) {
+        return
+    }
+
+    let entity = new AssertionMethod(params.id);
+    entity.didDoc = did;
+    entity.uri = params.uri;
+    entity.method = params.method;
+
+    entity.save()
+}
+
+function addKeyAgreement(did: string, index: string, value: Bytes): void {
+    let params = getAuthParams(did, "keyAgreement", "ka", index, value)
+    if (!params) {
+        return
+    }
+
+    let entity = new KeyAgreement(params.id);
+    entity.didDoc = did;
+    entity.uri = params.uri;
+    entity.method = params.method;
+
+    entity.save()
+}
+
+function addCapabilityInvocation(did: string, index: string, value: Bytes): void {
+    let params = getAuthParams(did, "capabilityInvocation", "ci", index, value)
+    if (!params) {
+        return
+    }
+
+    let entity = new CapabilityInvocation(params.id);
+    entity.didDoc = did;
+    entity.uri = params.uri;
+    entity.method = params.method;
+
+    entity.save()
+}
+
+function addCapabilityDelegation(did: string, index: string, value: Bytes): void {
+    let params = getAuthParams(did, "capabilityDelegation", "cd", index, value)
+    if (!params) {
+        return
+    }
+
+    let entity = new CapabilityDelegation(params.id);
+    entity.didDoc = did;
+    entity.uri = params.uri;
+    entity.method = params.method;
+
+    entity.save()
+}
+
+function addService(did: string, index: string, value: Bytes): void {
+    // parse value
+    let jsonValue = json.fromString(value.toString())
+    if (jsonValue.isNull()) {
+        log.warning("can not parse value {} as json", [value.toHexString()])
+        return;
+    }
+
+    if (jsonValue.kind != JSONValueKind.OBJECT) {
+        log.error("json value type error: {}", [jsonValue.kind.toString()])
+        return
+    }
+
+    let jsonObject = jsonValue.toObject()
+
+    // get service type
+    let typeJsonValue = jsonObject.get("type")
+    if (typeJsonValue == null) {
+        log.error("no type field in service", [])
+        return
+    }
+
+    if (typeJsonValue.kind != JSONValueKind.STRING) {
+        log.error("type of service type", [typeJsonValue.kind.toString()])
+        return
+    }
+
+    let typeValue = typeJsonValue.toString()
+
+    // get service
+    let endpointJsonValue = jsonObject.get("serviceEndpoint")
+    if (endpointJsonValue == null) {
+        log.error("no serviceEndpoint field in service", [])
+        return        
+    }
     
-// }
+
+    let id = `${did}#service_${index}`
+    let entity = new Service(id)
+
+    entity.didDoc = did
+    entity.type = typeValue
+    entity.serviceEndpoint = value
+
+    entity.save()
+}

@@ -16,17 +16,15 @@ dataSources:
       apiVersion: 0.0.9
       language: wasm/assemblyscript
       entities:
-        - DIDAttributeItemAdded
-        - DIDAttributeItemRevoked
-        - DIDAttributeRevoked
-        - DIDAttributeSet
-        - DIDControllerAdded
-        - DIDControllerRevoked
-        - DIDOwnerChanged
-        - DIDRegistered
-        - Initialized
-        - OwnershipTransferred
-        - Upgraded
+        - SingleMethod
+        - VerificationMethod
+        - Authentication
+        - AssertionMethod
+        - KeyAgreement
+        - CapabilityInvocation
+        - CapabilityDelegation
+        - Service
+        - DIDDocument
       abis:
         - name: DIDRegistry
           file: ./abis/DIDRegistry.json
@@ -49,8 +47,6 @@ dataSources:
           handler: handleDIDRegistered
         - event: Initialized(uint64)
           handler: handleInitialized
-        - event: OwnershipTransferred(indexed address,indexed address)
-          handler: handleOwnershipTransferred
         - event: Upgraded(indexed address)
           handler: handleUpgraded
       file: ./src/did-registry.ts

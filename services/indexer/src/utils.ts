@@ -38,3 +38,26 @@ export function uint128ToUUID(value: BigInt): string {
 export function uint128ToDID(value: BigInt): string {
     return "did:codatta:" + uint128ToUUID(value);
 }
+
+export function isValidDID(did: string): boolean {
+  // check prefix
+  if (!did.startsWith("did:")) {
+    return false;
+  }
+  
+  // check parts
+  const parts = did.split(":");
+  
+  // at least 3 parts
+  if (parts.length < 3) {
+    return false;
+  }
+  
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i].length == 0) {
+        return false;
+    }
+  }
+  
+  return true;
+}

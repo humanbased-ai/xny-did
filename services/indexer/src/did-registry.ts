@@ -54,10 +54,7 @@ export function handleDIDAttributeItemAdded(
       didEntify.alsoKnownAs!.push(event.params.value.toString());
     }
   } else {
-    let entity = ArrayAttributeHandler.addArrayAttibuteEntity(did, event.params.name, event.params.index.toString(), event.params.value)
-    if (entity == null) {
-      log.warning("entity creating failed, did: {}, name: {}, index: {}", [did, event.params.name, event.params.index.toString()])
-    }
+    ArrayAttributeHandler.addArrayAttibuteEntity(did, event.params.name, event.params.index.toString(), event.params.value)
   }
 }
 
@@ -75,7 +72,7 @@ export function handleDIDAttributeItemRevoked(
     return;
   }
 
-  ArrayAttributeHandler.removeArrayAttributeEntity(did, event.params.name, event.params.index.toString(), event.params.value)
+  ArrayAttributeHandler.removeArrayAttributeEntity(did, event.params.name, event.params.index.toString())
 }
 
 export function handleDIDAttributeSet(event: DIDAttributeSetEvent): void {
@@ -87,7 +84,85 @@ export function handleDIDAttributeSet(event: DIDAttributeSetEvent): void {
   let didEntify = DIDDocument.load(did)
   if (!didEntify) {
     log.error("did not found", [did])
+    return
   }
+}
+
+export function handleDIDAttributeRevoked(
+  event: DIDAttributeRevokedEvent
+): void {
+  if (!constants.KvAttribute.has(event.params.name)) {
+    log.warning("not expected kv attribute", [event.params.name])
+  }
+
+  let did = uint128ToDID(event.params.identifier);
+  let didEntify = DIDDocument.load(did)
+  if (!didEntify) {
+    log.error("did not found", [did])
+    return
+  }
+}
+
+export function handleDIDControllerAdded(event: DIDControllerAddedEvent): void {
+  let did = uint128ToDID(event.params.identifier);
+  let didEntify = DIDDocument.load(did)
+  if (!didEntify) {
+    log.error("did not found", [did])
+    return
+  }
+
+  let controller = uint128ToDID(event.params.controller)
+  didEntify.controller.push(controller)
+
+  didEntify.save()
+}
+
+export function handleDIDControllerRevoked(
+  event: DIDControllerRevokedEvent
+): void {
+  let did = uint128ToDID(event.params.identifier);
+  let didEntify = DIDDocument.load(did)
+  if (!didEntify) {
+    log.error("did not found", [did])
+    return
+  }
+
+  let controller = uint128ToDID(event.params.controller)
+  let controllers = didEntify.controller;
+  let found = false;
+  for (let i = 0; i < controllers.length; i++) {
+    if (controllers[i] == controller) {
+      log.info("controller removed, did: {}, controller: {}", [did, controller])
+      controllers.splice(i, 1)
+      found = true;
+      break
+    }
+  }
+
+  if (!found) {
+    log.error("controller not found, did: {}, controller: {}", [did, controller])
+    return
+  }
+
+  didEntify.save()
+}
+
+export function handleDIDOwnerChanged(event: DIDOwnerChangedEvent): void {
+  let did = uint128ToDID(event.params.identifier);
+  let didEntify = DIDDocument.load(did)
+  if (!didEntify) {
+    log.error("did not found", [did])
+    return
+  }
+
+  if (didEntify.owner != event.params.oldOwner) {
+    log.error("old owner not match, current owner: {}, old owner: {}", [didEntify.owner.toHexString(), event.params.oldOwner.toHexString()])
+    return
+  }
+
+  didEntify.owner = event.params.newOwner
+
+  didEntify.save()
 }
 
 export function handleDIDRegistered(event: DIDRegisteredEvent): void {
@@ -99,4 +174,30 @@ export function handleDIDRegistered(event: DIDRegisteredEvent): void {
   entity.owner = event.params.owner;
 
   entity.save()
+}
+
+export function handleInitialized(event: InitializedEvent): void {
+  // let entity = new Initialized(
+  //   event.transaction.hash.concatI32(event.logIndex.toI32())
+  // )
+  // entity.version = event.params.version
+
+  // entity.blockNumber = event.block.number
+  // entity.blockTimestamp = event.block.timestamp
+  // entity.transactionHash = event.transaction.hash
+
+  // entity.save()
+}
+
+export function handleUpgraded(event: UpgradedEvent): void {
+  // let entity = new Upgraded(
+  //   event.transaction.hash.concatI32(event.logIndex.toI32())
+  // )
+  // entity.implementation = event.params.implementation
+
+  // entity.blockNumber = event.block.number
+  // entity.blockTimestamp = event.block.timestamp
+  // entity.transactionHash = event.transaction.hash
+
+  // entity.save()
 }

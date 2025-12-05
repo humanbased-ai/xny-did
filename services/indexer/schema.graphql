@@ -13,35 +13,42 @@ type VerificationMethod @entity(immutable: true) {
   didDoc: DIDDocument!
 }
 
-type Authentication @entity(immutable: true) {
+interface BaseAuthEntity {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type AssertionMethod @entity(immutable: true) {
+type Authentication implements BaseAuthEntity @entity(immutable: true) {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type KeyAgreement @entity(immutable: true) {
+type AssertionMethod implements BaseAuthEntity @entity(immutable: true) {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type CapabilityInvocation @entity(immutable: true) {
+type KeyAgreement implements BaseAuthEntity @entity(immutable: true) {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type CapabilityDelegation @entity(immutable: true) {
+type CapabilityInvocation implements BaseAuthEntity @entity(immutable: true) {
+  id: ID!
+  uri: String
+  method: SingleMethod
+  didDoc: DIDDocument!
+}
+
+type CapabilityDelegation implements BaseAuthEntity @entity(immutable: true) {
   id: ID!
   uri: String
   method: SingleMethod
@@ -51,7 +58,7 @@ type CapabilityDelegation @entity(immutable: true) {
 type Service @entity(immutable: true) {
   id: ID!
   type: String!
-  serviceEndpoint: [String!]!
+  serviceEndpoint: Bytes!
   didDoc: DIDDocument!
 }
 
