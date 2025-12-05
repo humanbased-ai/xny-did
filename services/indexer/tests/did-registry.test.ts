@@ -8,8 +8,8 @@ import {
 } from "matchstick-as/assembly/index"
 import { BigInt, Bytes, Address, log } from "@graphprotocol/graph-ts"
 import { DIDAttributeItemAdded as DIDAttributeItemAddedEvent } from "../generated/DIDRegistry/DIDRegistry"
-import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet } from "../src/did-registry"
-import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent } from "./did-registry-utils"
+import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked } from "../src/did-registry"
+import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent } from "./did-registry-utils"
 import { uint128ToDID } from "../src/utils"
 import { DIDDocument } from "../generated/schema"
 
@@ -19,6 +19,14 @@ import { DIDDocument } from "../generated/schema"
 const identifier = BigInt.fromI32(234)
 const did = uint128ToDID(identifier)
 const owner = Address.fromBytes(Bytes.fromHexString("0x3db6B0550FBB3f84CD71859f2B5b16BA1a0fA67a"))
+
+function registerDID(): void {
+  let newDIDRegisteredEvent = createDIDRegisteredEvent(
+    identifier,
+    owner
+  )
+  handleDIDRegistered(newDIDRegisteredEvent)
+}
 
 describe("DID Registered", () => {
   beforeAll(() => {
@@ -54,6 +62,7 @@ describe("DID Registered", () => {
 describe("KV Attribute set", () => {
   afterAll(() => {
     clearStore()
+    registerDID()
   })
 
   // For more test scenarios, see:
@@ -67,5 +76,25 @@ describe("KV Attribute set", () => {
       Bytes.empty()
     )
     handleDIDAttributeSet(newEvent)
+  })
+})
+
+describe("KV Attribute revoked", () => {
+  afterAll(() => {
+    clearStore()
+    registerDID()
+  })
+
+  // For more test scenarios, see:
+  // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#write-a-unit-test
+
+  test("DIDAttributeRevoked created with name error", () => {
+    let newEvent = createDIDAttributeRevokedEvent(
+      identifier,
+      identifier,
+      "wrong",
+      Bytes.empty()
+    )
+    handleDIDAttributeRevoked(newEvent)
   })
 })

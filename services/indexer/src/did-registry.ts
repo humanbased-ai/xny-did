@@ -31,7 +31,7 @@ export function handleDIDAttributeItemAdded(
   event: DIDAttributeItemAddedEvent
 ): void {
   if (!constants.ArrayAttributeSet.has(event.params.name)) {
-    log.warning("not expected array attribute", [event.params.name])
+    log.error("not expected array attribute", [event.params.name])
   }
 
   let did = uint128ToDID(event.params.identifier);
@@ -62,7 +62,7 @@ export function handleDIDAttributeItemRevoked(
   event: DIDAttributeItemRevokedEvent
 ): void {
   if (!constants.ArrayAttributeSet.has(event.params.name)) {
-    log.warning("not expected array attribute", [event.params.name])
+    log.error("not expected array attribute", [event.params.name])
   }
 
   let did = uint128ToDID(event.params.identifier);
@@ -77,7 +77,7 @@ export function handleDIDAttributeItemRevoked(
 
 export function handleDIDAttributeSet(event: DIDAttributeSetEvent): void {
   if (!constants.KvAttribute.has(event.params.name)) {
-    log.warning("not expected kv attribute", [event.params.name])
+    log.error("not expected kv attribute", [event.params.name])
   }
 
   let did = uint128ToDID(event.params.identifier);
@@ -92,7 +92,7 @@ export function handleDIDAttributeRevoked(
   event: DIDAttributeRevokedEvent
 ): void {
   if (!constants.KvAttribute.has(event.params.name)) {
-    log.warning("not expected kv attribute", [event.params.name])
+    log.error("not expected kv attribute", [event.params.name])
   }
 
   let did = uint128ToDID(event.params.identifier);
