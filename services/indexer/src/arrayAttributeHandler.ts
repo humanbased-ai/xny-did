@@ -49,7 +49,7 @@ export class ArrayAttributeHandler {
     }
 }
 
-function addSingleMethod(did: string, parentType: string, index: string, value: Bytes): SingleMethod | null {
+function addSingleMethod(did: string, id: string, parentType: string, index: string, value: Bytes): SingleMethod | null {
     // parse value
     let result = json.try_fromBytes(value)
     if (result.isError) {
@@ -103,8 +103,6 @@ function addSingleMethod(did: string, parentType: string, index: string, value: 
             return null
         }
     }
-    
-    let id = `${did}#vm_${index}`
 
     let method = new SingleMethod(id);
     method.controller = controllerValue;
@@ -119,7 +117,8 @@ function addSingleMethod(did: string, parentType: string, index: string, value: 
 }
 
 function addVerificationMethod(did: string, index: string, value: Bytes): void {
-    let method = addSingleMethod(did, "VerificationMethod", index, value)
+    let id = `${did}#vm_${index}`
+    let method = addSingleMethod(did, id, "VerificationMethod", index, value)
 
     if (method == null) {
         return;
@@ -141,36 +140,18 @@ class AuthParam {
 }
 
 function getAuthParams(did: string, name: string, authPrefix: string, index: string, value: Bytes): AuthParam | null {
-    // parse value
-    let result = json.try_fromBytes(value)
-    if (result.isError) {
-        Logger.error("can not parse value {} as json", [value.toHexString()])
-        return null;
-    }
-    
-    let jsonValue = result.value
-
     let id = `${did}#${authPrefix}_${index}`
-    // if string, it should be a did
-    if (jsonValue.kind == JSONValueKind.STRING) {
-        let stringValue = jsonValue.toString()
-        if (!utils.isValidDID(stringValue)) {
-            log.error("not a valid did: {}", [stringValue])
+    // object first
+    let method = addSingleMethod(did, id, name, index, value)
+    if (method == null) {
+        if (!utils.isValidDID(value.toString())) {
+            Logger.error("not a valid did: {}", [value.toHexString()])
             return null;
+        } else {
+            return {id, uri: value.toString(), method: null}
         }
-
-        return {id, uri: stringValue, method: null}
-    } else if (jsonValue.kind == JSONValueKind.OBJECT) {
-        let method = addSingleMethod(did, name, index, value)
-
-        if (method == null) {
-            return null;
-        }
-
-        return {id, uri: null, method: method.id}
     } else {
-        log.error("json value type error: {}", [jsonValue.kind.toString()])
-        return null;
+        return {id, uri: null, method: method.id}
     }
 }
 
@@ -255,7 +236,7 @@ function addService(did: string, index: string, value: Bytes): void {
     let jsonValue = result.value
 
     if (jsonValue.kind != JSONValueKind.OBJECT) {
-        log.error("json value type error: {}", [jsonValue.kind.toString()])
+        Logger.error("json value type error: {}", [jsonValue.kind.toString()])
         return
     }
 
@@ -264,12 +245,12 @@ function addService(did: string, index: string, value: Bytes): void {
     // get service type
     let typeJsonValue = jsonObject.get("type")
     if (typeJsonValue == null) {
-        log.error("no type field in service", [])
+        Logger.error("no type field in service", [])
         return
     }
 
     if (typeJsonValue.kind != JSONValueKind.STRING) {
-        log.error("type of service type", [typeJsonValue.kind.toString()])
+        Logger.error("type of service type", [typeJsonValue.kind.toString()])
         return
     }
 
@@ -278,7 +259,7 @@ function addService(did: string, index: string, value: Bytes): void {
     // get service
     let endpointJsonValue = jsonObject.get("serviceEndpoint")
     if (endpointJsonValue == null) {
-        log.error("no serviceEndpoint field in service", [])
+        Logger.error("no serviceEndpoint field in service", [])
         return        
     }
     

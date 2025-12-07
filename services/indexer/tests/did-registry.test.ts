@@ -13,7 +13,7 @@ import { DIDAttributeItemAdded as DIDAttributeItemAddedEvent } from "../generate
 import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked } from "../src/did-registry"
 import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent } from "./did-registry-utils"
 import { uint128ToDID } from "../src/utils"
-import { DIDDocument, SingleMethod, VerificationMethod } from "../generated/schema"
+import { Authentication, DIDDocument, SingleMethod, VerificationMethod } from "../generated/schema"
 import { Logger } from "../src/logger"
 import {TestLoggerBackend} from "./logger"
 import {KvAttribute} from "../src/constants"
@@ -448,16 +448,72 @@ describe("Array Attribute added", () => {
   })
 
   describe("Authentication", () => {
-    test("value not json string", () => {
+    beforeEach(() => {
+      registerDID()
     })
 
-    test("value is string", () => {
+    afterEach(() => {
+      clearStore()
+    })
+
+    test("value is string but not a did", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "authentication",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+
+      handleDIDAttributeItemAdded(newEvent)
+      assert.assertTrue(testLogger.messages.pop().includes("not a valid did") as boolean)
+    })
+
+    test("value is a did string", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "authentication",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(did)
+      )
+
+      handleDIDAttributeItemAdded(newEvent)
+      
+      let id = `${did}#auth_0`
+      let entity = Authentication.load(id)
+      assert.assertNotNull(entity, "entity should not be null")
+      assert.assertTrue(entity!.id! == id, "id not match")
+      assert.assertTrue(entity!.uri! == did, "uri error")
+      assert.assertNull(entity!.method, "method should be null")
     })
 
     test("value is object", () => {
-    })
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "authentication",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8('{"type":"123"}')
+      )
 
-    test("value type error", () => {
+      handleDIDAttributeItemAdded(newEvent)
+      
+      let id = `${did}#auth_0`
+      let entity = Authentication.load(id)
+      assert.assertNotNull(entity, "entity should not be null")
+      let method = SingleMethod.load(id)
+      assert.assertNotNull(method, "method should not be null")
+      assert.assertTrue(method!.id! == id, "id not match")
     })
   })
 
