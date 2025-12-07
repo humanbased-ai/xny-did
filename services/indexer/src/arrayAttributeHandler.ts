@@ -51,11 +51,13 @@ export class ArrayAttributeHandler {
 
 function addSingleMethod(did: string, parentType: string, index: string, value: Bytes): SingleMethod | null {
     // parse value
-    let jsonValue = json.fromString(value.toString())
-    if (jsonValue.isNull()) {
+    let result = json.try_fromBytes(value)
+    if (result.isError) {
         Logger.error("can not parse value {} as json", [value.toHexString()])
         return null;
     }
+    
+    let jsonValue = result.value
 
     // origin value data should be an object
     if (jsonValue.kind != JSONValueKind.OBJECT) {
@@ -107,7 +109,7 @@ function addSingleMethod(did: string, parentType: string, index: string, value: 
     let method = new SingleMethod(id);
     method.controller = controllerValue;
     method.type = typeValue;
-    method.value = value.toString();
+    method.value = value;
     method.parentId = id;
     method.parentType = parentType;
 
@@ -125,6 +127,9 @@ function addVerificationMethod(did: string, index: string, value: Bytes): void {
 
     let entity = new VerificationMethod(method.id);
     entity.method = method.id;
+    entity.didDoc = did;
+
+    entity.save()
 
     return;
 }
@@ -137,11 +142,13 @@ class AuthParam {
 
 function getAuthParams(did: string, name: string, authPrefix: string, index: string, value: Bytes): AuthParam | null {
     // parse value
-    let jsonValue = json.fromString(value.toString())
-    if (jsonValue.isNull()) {
+    let result = json.try_fromBytes(value)
+    if (result.isError) {
         Logger.error("can not parse value {} as json", [value.toHexString()])
         return null;
     }
+    
+    let jsonValue = result.value
 
     let id = `${did}#${authPrefix}_${index}`
     // if string, it should be a did
@@ -239,11 +246,13 @@ function addCapabilityDelegation(did: string, index: string, value: Bytes): void
 
 function addService(did: string, index: string, value: Bytes): void {
     // parse value
-    let jsonValue = json.fromString(value.toString())
-    if (jsonValue.isNull()) {
+    let result = json.try_fromBytes(value)
+    if (result.isError) {
         Logger.error("can not parse value {} as json", [value.toHexString()])
         return;
     }
+    
+    let jsonValue = result.value
 
     if (jsonValue.kind != JSONValueKind.OBJECT) {
         log.error("json value type error: {}", [jsonValue.kind.toString()])

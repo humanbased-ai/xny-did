@@ -2,7 +2,7 @@ type SingleMethod @entity(immutable: true) {
   id: ID!
   controller: String!
   type: String!
-  value: String!
+  value: Bytes!
   parentId: ID!
   parentType: String!
 }
