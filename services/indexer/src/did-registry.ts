@@ -26,18 +26,20 @@ import { uint128ToUUID, uint128ToDID } from "./utils"
 import * as constants from "./constants"
 import { log } from "@graphprotocol/graph-ts"
 import {ArrayAttributeHandler} from "./arrayAttributeHandler"
+import { Logger } from "./logger"
 
 export function handleDIDAttributeItemAdded(
   event: DIDAttributeItemAddedEvent
 ): void {
   if (!constants.ArrayAttributeSet.has(event.params.name)) {
-    log.error("not expected array attribute", [event.params.name])
+    Logger.error("not expected array attribute: {}", [event.params.name])
+    return
   }
 
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did)
   if (didEntify == null) {
-    log.error("did not found", [did])
+    Logger.error("did not found", [did])
     return;
   }
 
@@ -45,14 +47,20 @@ export function handleDIDAttributeItemAdded(
     if (didEntify.context == null) {
       didEntify.context = [event.params.value.toString()]
     } else {
-      didEntify.context!.push(event.params.value.toString());
+      let context = didEntify.context!;
+      context.push(event.params.value.toString());
+      didEntify.context = context;
     }
+    didEntify.save()
   } else if (event.params.name == constants.ArrayAttributes.ALSO_KNOWN_AS) {
     if (didEntify.alsoKnownAs == null) {
       didEntify.alsoKnownAs = [event.params.value.toString()]
     } else {
-      didEntify.alsoKnownAs!.push(event.params.value.toString());
+      let alsoKnownAs = didEntify.alsoKnownAs!;
+      alsoKnownAs.push(event.params.value.toString());
+      didEntify.alsoKnownAs = alsoKnownAs;
     }
+    didEntify.save()
   } else {
     ArrayAttributeHandler.addArrayAttibuteEntity(did, event.params.name, event.params.index.toString(), event.params.value)
   }
@@ -62,13 +70,14 @@ export function handleDIDAttributeItemRevoked(
   event: DIDAttributeItemRevokedEvent
 ): void {
   if (!constants.ArrayAttributeSet.has(event.params.name)) {
-    log.error("not expected array attribute", [event.params.name])
+    Logger.error("not expected array attribute", [event.params.name])
+    return
   }
 
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did)
   if (didEntify == null) {
-    log.error("did not found", [did])
+    Logger.error("did not found", [did])
     return;
   }
 
@@ -77,13 +86,14 @@ export function handleDIDAttributeItemRevoked(
 
 export function handleDIDAttributeSet(event: DIDAttributeSetEvent): void {
   if (!constants.KvAttribute.has(event.params.name)) {
-    log.error("not expected kv attribute", [event.params.name])
+    Logger.error("not expected kv attribute", [event.params.name])
+    return
   }
 
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did)
   if (!didEntify) {
-    log.error("did not found", [did])
+    Logger.error("did not found", [did])
     return
   }
 }
@@ -92,13 +102,14 @@ export function handleDIDAttributeRevoked(
   event: DIDAttributeRevokedEvent
 ): void {
   if (!constants.KvAttribute.has(event.params.name)) {
-    log.error("not expected kv attribute", [event.params.name])
+    Logger.error("not expected kv attribute", [event.params.name])
+    return
   }
 
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did)
   if (!didEntify) {
-    log.error("did not found", [did])
+    Logger.error("did not found", [did])
     return
   }
 }
@@ -107,12 +118,13 @@ export function handleDIDControllerAdded(event: DIDControllerAddedEvent): void {
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did)
   if (!didEntify) {
-    log.error("did not found", [did])
+    Logger.error("did not found", [did])
     return
   }
 
-  let controller = uint128ToDID(event.params.controller)
-  didEntify.controller.push(controller)
+  let controller = didEntify.controller!;
+  controller.push(uint128ToDID(event.params.controller));
+  didEntify.controller = controller;
 
   didEntify.save()
 }
@@ -123,7 +135,7 @@ export function handleDIDControllerRevoked(
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did)
   if (!didEntify) {
-    log.error("did not found", [did])
+    Logger.error("did not found", [did])
     return
   }
 
@@ -140,7 +152,7 @@ export function handleDIDControllerRevoked(
   }
 
   if (!found) {
-    log.error("controller not found, did: {}, controller: {}", [did, controller])
+    Logger.error("controller not found, did: {}, controller: {}", [did, controller])
     return
   }
 
@@ -151,12 +163,12 @@ export function handleDIDOwnerChanged(event: DIDOwnerChangedEvent): void {
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did)
   if (!didEntify) {
-    log.error("did not found", [did])
+    Logger.error("did not found", [did])
     return
   }
 
   if (didEntify.owner != event.params.oldOwner) {
-    log.error("old owner not match, current owner: {}, old owner: {}", [didEntify.owner.toHexString(), event.params.oldOwner.toHexString()])
+    Logger.error("old owner not match, current owner: {}, old owner: {}", [didEntify.owner.toHexString(), event.params.oldOwner.toHexString()])
     return
   }
 

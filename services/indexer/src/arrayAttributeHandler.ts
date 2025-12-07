@@ -2,6 +2,7 @@ import { json, JSONValue, JSONValueKind, log, BigInt, Bytes, Entity, store, Valu
 import {ArrayAttributes} from "./constants";
 import {Authentication, SingleMethod, VerificationMethod, Service, CapabilityDelegation, CapabilityInvocation, KeyAgreement, AssertionMethod} from "../generated/schema";
 import * as utils from "./utils";
+import { Logger } from "./logger";
 
 export class ArrayAttributeHandler {
     static addArrayAttibuteEntity(did: string, name: string, index: string, value: Bytes): void {
@@ -52,27 +53,27 @@ function addSingleMethod(did: string, parentType: string, index: string, value: 
     // parse value
     let jsonValue = json.fromString(value.toString())
     if (jsonValue.isNull()) {
-        log.warning("can not parse value {} as json", [value.toHexString()])
+        Logger.error("can not parse value {} as json", [value.toHexString()])
         return null;
     }
 
     // origin value data should be an object
     if (jsonValue.kind != JSONValueKind.OBJECT) {
-        log.warning("the origin value is not an object", []);
+        Logger.error("the origin value is not an object", []);
         return null;
     }
 
     let jsonObject = jsonValue.toObject()
 
-    // type MUST HAVE
+    // type MUST exist
     let typeJsonValue = jsonObject.get("type")
     if (typeJsonValue == null) {
-        log.warning("no method type", []);
+        Logger.error("no method type", []);
         return null
     }
 
     if (typeJsonValue.kind != JSONValueKind.STRING) {
-        log.warning("type value should be a string", []);
+        Logger.error("type value should be a string", []);
         return null
     }
 
@@ -87,7 +88,7 @@ function addSingleMethod(did: string, parentType: string, index: string, value: 
         if (controllerJsonValue.kind == JSONValueKind.NUMBER) {
             let controllerF64 = controllerJsonValue.toF64()
             if (controllerF64 != Math.floor(controllerF64)) {
-                log.warning("controller not integer", [])
+                Logger.error("controller not integer", [])
                 return null
             }
             let idValue: BigInt = BigInt.fromI64(<i64>controllerF64)
@@ -96,7 +97,7 @@ function addSingleMethod(did: string, parentType: string, index: string, value: 
             let idValue: BigInt = BigInt.fromString(controllerJsonValue.toString())
             controllerValue = utils.uint128ToDID(idValue)
         } else {
-            log.warning("type of controller error", [controllerJsonValue.kind.toString()])
+            Logger.error("type of controller error", [controllerJsonValue.kind.toString()])
             return null
         }
     }
@@ -138,7 +139,7 @@ function getAuthParams(did: string, name: string, authPrefix: string, index: str
     // parse value
     let jsonValue = json.fromString(value.toString())
     if (jsonValue.isNull()) {
-        log.warning("can not parse value {} as json", [value.toHexString()])
+        Logger.error("can not parse value {} as json", [value.toHexString()])
         return null;
     }
 
@@ -240,7 +241,7 @@ function addService(did: string, index: string, value: Bytes): void {
     // parse value
     let jsonValue = json.fromString(value.toString())
     if (jsonValue.isNull()) {
-        log.warning("can not parse value {} as json", [value.toHexString()])
+        Logger.error("can not parse value {} as json", [value.toHexString()])
         return;
     }
 
