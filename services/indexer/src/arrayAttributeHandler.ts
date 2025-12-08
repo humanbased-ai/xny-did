@@ -250,7 +250,7 @@ function addService(did: string, index: string, value: Bytes): void {
     }
 
     if (typeJsonValue.kind != JSONValueKind.STRING) {
-        Logger.error("type of service type", [typeJsonValue.kind.toString()])
+        Logger.error("type of service type not string: {}", [typeJsonValue.kind.toString()])
         return
     }
 

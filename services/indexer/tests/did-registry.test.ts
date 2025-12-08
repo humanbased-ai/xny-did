@@ -13,7 +13,7 @@ import { DIDAttributeItemAdded as DIDAttributeItemAddedEvent } from "../generate
 import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked } from "../src/did-registry"
 import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent } from "./did-registry-utils"
 import { uint128ToDID } from "../src/utils"
-import { Authentication, DIDDocument, SingleMethod, VerificationMethod } from "../generated/schema"
+import { Authentication, DIDDocument, Service, SingleMethod, VerificationMethod } from "../generated/schema"
 import { Logger } from "../src/logger"
 import {TestLoggerBackend} from "./logger"
 import {KvAttribute} from "../src/constants"
@@ -518,16 +518,113 @@ describe("Array Attribute added", () => {
   })
 
   describe("Service", () => {
+    beforeEach(() => {
+      registerDID()
+    })
+
+    afterEach(() => {
+      clearStore()
+    })
+
     test("value not json string", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "service",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+
+      handleDIDAttributeItemAdded(newEvent)
+      assert.assertTrue(testLogger.messages.pop().includes("can not parse value") as boolean)
     })
 
-    test("value is string", () => {
+    test("value is not object", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "service",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8('["asdf"]')
+      )
+
+      handleDIDAttributeItemAdded(newEvent)
+      assert.assertTrue(testLogger.messages.pop().includes("json value type error") as boolean)
     })
 
-    test("value is object", () => {
+    test("value is object with no type field", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "service",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8('{"asdf":"asdf"}')
+      )
+
+      handleDIDAttributeItemAdded(newEvent)
+      assert.assertTrue(testLogger.messages.pop().includes("no type field in service") as boolean)
     })
 
-    test("value type error", () => {
+    test("value is object with type field not string", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "service",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8('{"type":123}')
+      )
+
+      handleDIDAttributeItemAdded(newEvent)
+      assert.assertTrue(testLogger.messages.pop().includes("type of service type not string") as boolean)
+    })
+
+    test("value is object with no serviceEndpoint field", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "service",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8('{"type":"123"}')
+      )
+
+      handleDIDAttributeItemAdded(newEvent)
+      assert.assertTrue(testLogger.messages.pop().includes("no serviceEndpoint field in service") as boolean)
+    })
+
+    test("value is right", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "service",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8('{"type":"123","serviceEndpoint":"serviceEndpoint"}')
+      )
+
+      handleDIDAttributeItemAdded(newEvent)
+      
+      let id = `${did}#service_0`
+      let entity = Service.load(id)
+      assert.assertNotNull(entity, "service entity should not be null")
+      assert.assertTrue(entity!.type == "123", "type error")
+      assert.assertTrue(entity!.serviceEndpoint == Bytes.fromUTF8('{"type":"123","serviceEndpoint":"serviceEndpoint"}'), "type serviceEndpoint")
     })
   })
 })
