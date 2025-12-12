@@ -48,6 +48,12 @@ export function handleDIDAttributeItemAdded(
       didEntify.context = [event.params.value.toString()]
     } else {
       let context = didEntify.context!;
+      for (let i = 0; i < context.length; i++) {
+        if (context[i] == event.params.value.toString()) {
+          Logger.error("context already exists, did: {}, controller: {}", [did, event.params.value.toString()])
+          return;
+        }
+      }
       context.push(event.params.value.toString());
       didEntify.context = context;
     }
@@ -57,6 +63,12 @@ export function handleDIDAttributeItemAdded(
       didEntify.alsoKnownAs = [event.params.value.toString()]
     } else {
       let alsoKnownAs = didEntify.alsoKnownAs!;
+      for (let i = 0; i < alsoKnownAs.length; i++) {
+        if (alsoKnownAs[i] == event.params.value.toString()) {
+          Logger.error("alsoKnownAs already exists, did: {}, alsoKnownAs: {}", [did, event.params.value.toString()])
+          return;
+        }
+      }
       alsoKnownAs.push(event.params.value.toString());
       didEntify.alsoKnownAs = alsoKnownAs;
     }

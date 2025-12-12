@@ -154,135 +154,151 @@ describe("Array Attribute added", () => {
   // For more test scenarios, see:
   // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#write-a-unit-test
 
-  // test("DIDAttributeItemAdded failed with name error", () => {
-  //   const testLogger = new TestLoggerBackend()
-  //   Logger.backend = testLogger
+  test("DIDAttributeItemAdded failed with name error", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
 
-  //   let newEvent = createDIDAttributeItemAddedEvent(
-  //     identifier,
-  //     identifier,
-  //     "wrong",
-  //     BigInt.fromString("0"),
-  //     Bytes.empty()
-  //   )
-  //   handleDIDAttributeItemAdded(newEvent)
-  //   assert.assertTrue(testLogger.messages.pop().includes("not expected array attribute") as boolean)
-  // })
+    let newEvent = createDIDAttributeItemAddedEvent(
+      identifier,
+      identifier,
+      "wrong",
+      BigInt.fromString("0"),
+      Bytes.empty()
+    )
+    handleDIDAttributeItemAdded(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("not expected array attribute") as boolean)
+  })
 
-  // test("DIDAttributeItemAdded failed with did not found", () => {
-  //   const testLogger = new TestLoggerBackend()
-  //   Logger.backend = testLogger
+  test("DIDAttributeItemAdded failed with did not found", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
 
-  //   let newEvent = createDIDAttributeItemAddedEvent(
-  //     identifier,
-  //     identifier,
-  //     "authentication",
-  //     BigInt.fromString("0"),
-  //     Bytes.empty()
-  //   )
-  //   handleDIDAttributeItemAdded(newEvent)
-  //   assert.assertTrue(testLogger.messages.pop().includes("did not found") as boolean)
-  // })
+    let newEvent = createDIDAttributeItemAddedEvent(
+      identifier,
+      identifier,
+      "authentication",
+      BigInt.fromString("0"),
+      Bytes.empty()
+    )
+    handleDIDAttributeItemAdded(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("did not found") as boolean)
+  })
 
-  // describe("Context", () => {
-  //   beforeEach(() => {
-  //     registerDID()
-  //   })
+  describe("Context", () => {
+    beforeEach(() => {
+      registerDID()
+    })
 
-  //   afterEach(() => {
-  //     clearStore()
-  //   })
+    afterEach(() => {
+      clearStore()
+    })
 
-  //   test("Current context is null", () => {
-  //     const testLogger = new TestLoggerBackend()
-  //     Logger.backend = testLogger
+    test("Current context is null", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
       
-  //     let newEvent = createDIDAttributeItemAddedEvent(
-  //       identifier,
-  //       identifier,
-  //       "@context",
-  //       BigInt.fromString("0"),
-  //       Bytes.fromUTF8(stringValue)
-  //     )
-  //     handleDIDAttributeItemAdded(newEvent)
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "@context",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+      handleDIDAttributeItemAdded(newEvent)
 
-  //     let entity = DIDDocument.load(did)
-  //     assert.assertNotNull(entity, "document should not be null")
-  //     assert.assertNotNull(entity!.context, "context should not be null")
-  //     assert.assertTrue(entity!.context!.length == 1, "context length should exactly 1")
-  //     assert.assertTrue(entity!.context![0] == stringValue)
-  //   })
+      let entity = DIDDocument.load(did)
+      assert.assertNotNull(entity, "document should not be null")
+      assert.assertNotNull(entity!.context, "context should not be null")
+      assert.assertTrue(entity!.context!.length == 1, "context length should exactly 1")
+      assert.assertTrue(entity!.context![0] == stringValue)
+    })
 
-  //   test("Current context is not null", () => {
-  //     const testLogger = new TestLoggerBackend()
-  //     Logger.backend = testLogger
+    test("Current context is not null", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
 
-  //     registerDID()
+      registerDID()
       
-  //     let newEvent = createDIDAttributeItemAddedEvent(
-  //       identifier,
-  //       identifier,
-  //       "@context",
-  //       BigInt.fromString("0"),
-  //       Bytes.fromUTF8(stringValue)
-  //     )
-  //     handleDIDAttributeItemAdded(newEvent)
-  //     handleDIDAttributeItemAdded(newEvent)
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "@context",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+      handleDIDAttributeItemAdded(newEvent)
 
-  //     let entity = DIDDocument.load(did)
-  //     assert.assertTrue(entity!.context!.length == 2)
-  //     assert.assertTrue(entity!.context![0] == stringValue)
-  //     assert.assertTrue(entity!.context![1] == stringValue)
-  //   })
-  // })
+      newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "@context",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue + "0")
+      )
+      handleDIDAttributeItemAdded(newEvent)
 
-  // describe("Also known as", () => {
-  //   beforeEach(() => {
-  //     registerDID()
-  //   })
+      let entity = DIDDocument.load(did)
+      assert.assertTrue(entity!.context!.length == 2)
+      assert.assertTrue(entity!.context![0] == stringValue)
+      assert.assertTrue(entity!.context![1] == stringValue + "0")
+    })
+  })
 
-  //   afterEach(() => {
-  //     clearStore()
-  //   })
+  describe("Also known as", () => {
+    beforeEach(() => {
+      registerDID()
+    })
 
-  //   test("Current alsoKnownAs is null", () => {
-  //     const testLogger = new TestLoggerBackend()
-  //     Logger.backend = testLogger
+    afterEach(() => {
+      clearStore()
+    })
+
+    test("Current alsoKnownAs is null", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
       
-  //     let newEvent = createDIDAttributeItemAddedEvent(
-  //       identifier,
-  //       identifier,
-  //       "alsoKnownAs",
-  //       BigInt.fromString("0"),
-  //       Bytes.fromUTF8(stringValue)
-  //     )
-  //     handleDIDAttributeItemAdded(newEvent)
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "alsoKnownAs",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+      handleDIDAttributeItemAdded(newEvent)
 
-  //     let entity = DIDDocument.load(did)
-  //     assert.assertTrue(entity!.alsoKnownAs!.length == 1)
-  //     assert.assertTrue(entity!.alsoKnownAs![0] == stringValue)
-  //   })
+      let entity = DIDDocument.load(did)
+      assert.assertTrue(entity!.alsoKnownAs!.length == 1)
+      assert.assertTrue(entity!.alsoKnownAs![0] == stringValue)
+    })
 
-  //   test("Current alsoKnownAs is not null", () => {
-  //     const testLogger = new TestLoggerBackend()
-  //     Logger.backend = testLogger
+    test("Current alsoKnownAs is not null", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
       
-  //     let newEvent = createDIDAttributeItemAddedEvent(
-  //       identifier,
-  //       identifier,
-  //       "alsoKnownAs",
-  //       BigInt.fromString("0"),
-  //       Bytes.fromUTF8(stringValue)
-  //     )
-  //     handleDIDAttributeItemAdded(newEvent)
-  //     handleDIDAttributeItemAdded(newEvent)
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "alsoKnownAs",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+      handleDIDAttributeItemAdded(newEvent)
 
-  //     let entity = DIDDocument.load(did)
-  //     assert.assertTrue(entity!.alsoKnownAs!.length == 2)
-  //     assert.assertTrue(entity!.alsoKnownAs![0] == stringValue)
-  //     assert.assertTrue(entity!.alsoKnownAs![1] == stringValue)
-  //   })
-  // })
+      newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        "alsoKnownAs",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue + "0")
+      )
+      handleDIDAttributeItemAdded(newEvent)
+
+      let entity = DIDDocument.load(did)
+      assert.assertTrue(entity!.alsoKnownAs!.length == 2)
+      assert.assertTrue(entity!.alsoKnownAs![0] == stringValue)
+      assert.assertTrue(entity!.alsoKnownAs![1] == stringValue + "0")
+    })
+  })
 
   describe("Verification method", () => {
     beforeEach(() => {
