@@ -78,7 +78,7 @@ function addSingleMethod(
   // parse value
   let result = json.try_fromBytes(value);
   if (result.isError) {
-    Logger.error('can not parse value {} as json', [value.toHexString()]);
+    Logger.error('addSingleMethod - can not parse value {} as json', [value.toHexString()]);
     return null;
   }
 
@@ -86,7 +86,7 @@ function addSingleMethod(
 
   // origin value data should be an object
   if (jsonValue.kind != JSONValueKind.OBJECT) {
-    Logger.error('the origin value is not an object', []);
+    Logger.error('addSingleMethod - the origin value is not an object', []);
     return null;
   }
 
@@ -95,12 +95,12 @@ function addSingleMethod(
   // type MUST exist
   let typeJsonValue = jsonObject.get('type');
   if (typeJsonValue == null) {
-    Logger.error('no method type', []);
+    Logger.error('addSingleMethod - no method type', []);
     return null;
   }
 
   if (typeJsonValue.kind != JSONValueKind.STRING) {
-    Logger.error('type value should be a string', []);
+    Logger.error('addSingleMethod - type value should be a string', []);
     return null;
   }
 
@@ -115,7 +115,7 @@ function addSingleMethod(
     if (controllerJsonValue.kind == JSONValueKind.NUMBER) {
       let controllerF64 = controllerJsonValue.toF64();
       if (controllerF64 != Math.floor(controllerF64)) {
-        Logger.error('controller not integer', []);
+        Logger.error('addSingleMethod - controller not integer', []);
         return null;
       }
       let idValue: BigInt = BigInt.fromI64(<i64>controllerF64);
@@ -124,7 +124,7 @@ function addSingleMethod(
       let idValue: BigInt = BigInt.fromString(controllerJsonValue.toString());
       controllerValue = utils.uint128ToDID(idValue);
     } else {
-      Logger.error('type of controller error', [controllerJsonValue.kind.toString()]);
+      Logger.error('addSingleMethod - type of controller error: {}', [controllerJsonValue.kind.toString()]);
       return null;
     }
   }
@@ -176,7 +176,7 @@ function getAuthParams(
   let method = addSingleMethod(did, id, name, index, value);
   if (method == null) {
     if (!utils.isValidDID(value.toString())) {
-      Logger.error('not a valid did: {}', [value.toHexString()]);
+      Logger.error('getAuthParams - not a valid did: {}', [value.toHexString()]);
       return null;
     } else {
       return { id, uri: value.toString(), method: null };
@@ -260,14 +260,14 @@ function addService(did: string, index: string, value: Bytes): void {
   // parse value
   let result = json.try_fromBytes(value);
   if (result.isError) {
-    Logger.error('can not parse value {} as json', [value.toHexString()]);
+    Logger.error('addService - can not parse value {} as json', [value.toHexString()]);
     return;
   }
 
   let jsonValue = result.value;
 
   if (jsonValue.kind != JSONValueKind.OBJECT) {
-    Logger.error('json value type error: {}', [jsonValue.kind.toString()]);
+    Logger.error('addService - json value type error: {}', [jsonValue.kind.toString()]);
     return;
   }
 
@@ -276,12 +276,12 @@ function addService(did: string, index: string, value: Bytes): void {
   // get service type
   let typeJsonValue = jsonObject.get('type');
   if (typeJsonValue == null) {
-    Logger.error('no type field in service', []);
+    Logger.error('addService - no type field in service', []);
     return;
   }
 
   if (typeJsonValue.kind != JSONValueKind.STRING) {
-    Logger.error('type of service type not string: {}', [typeJsonValue.kind.toString()]);
+    Logger.error('addService - type of service type not string: {}', [typeJsonValue.kind.toString()]);
     return;
   }
 
@@ -290,7 +290,7 @@ function addService(did: string, index: string, value: Bytes): void {
   // get service
   let endpointJsonValue = jsonObject.get('serviceEndpoint');
   if (endpointJsonValue == null) {
-    Logger.error('no serviceEndpoint field in service', []);
+    Logger.error('addService - no serviceEndpoint field in service', []);
     return;
   }
 

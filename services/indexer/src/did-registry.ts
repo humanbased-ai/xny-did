@@ -29,15 +29,16 @@ import { ArrayAttributeHandler } from './arrayAttributeHandler';
 import { Logger } from './logger';
 
 export function handleDIDAttributeItemAdded(event: DIDAttributeItemAddedEvent): void {
+  let did = uint128ToDID(event.params.identifier);
+
   if (!constants.ArrayAttributeSet.has(event.params.name)) {
-    Logger.error('not expected array attribute: {}', [event.params.name]);
+    Logger.error('handleDIDAttributeItemAdded - not expected array attribute: did: {}, name: {}', [did, event.params.name]);
     return;
   }
 
-  let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did);
   if (didEntify == null) {
-    Logger.error('did not found', [did]);
+    Logger.error('handleDIDAttributeItemAdded - did not found: {}', [did]);
     return;
   }
 
@@ -48,7 +49,7 @@ export function handleDIDAttributeItemAdded(event: DIDAttributeItemAddedEvent): 
       let context = didEntify.context!;
       for (let i = 0; i < context.length; i++) {
         if (context[i] == event.params.value.toString()) {
-          Logger.error('context already exists, did: {}, controller: {}', [
+          Logger.error('handleDIDAttributeItemAdded - context already exists, did: {}, controller: {}', [
             did,
             event.params.value.toString(),
           ]);
@@ -66,7 +67,7 @@ export function handleDIDAttributeItemAdded(event: DIDAttributeItemAddedEvent): 
       let alsoKnownAs = didEntify.alsoKnownAs!;
       for (let i = 0; i < alsoKnownAs.length; i++) {
         if (alsoKnownAs[i] == event.params.value.toString()) {
-          Logger.error('alsoKnownAs already exists, did: {}, alsoKnownAs: {}', [
+          Logger.error('handleDIDAttributeItemAdded - alsoKnownAs already exists, did: {}, alsoKnownAs: {}', [
             did,
             event.params.value.toString(),
           ]);
@@ -89,20 +90,20 @@ export function handleDIDAttributeItemAdded(event: DIDAttributeItemAddedEvent): 
 
 export function handleDIDAttributeItemRevoked(event: DIDAttributeItemRevokedEvent): void {
   if (!constants.ArrayAttributeSet.has(event.params.name)) {
-    Logger.error('not expected array attribute', [event.params.name]);
+    Logger.error('handleDIDAttributeItemRevoked - not expected array attribute: {}', [event.params.name]);
     return;
   }
 
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did);
   if (didEntify == null) {
-    Logger.error('did not found', [did]);
+    Logger.error('handleDIDAttributeItemRevoked - did not found: {}', [did]);
     return;
   }
 
   if (event.params.name == constants.ArrayAttributes.CONTEXT) {
     if (didEntify.context == null) {
-      Logger.error('no context, did: {}, context: {}', [did, event.params.value.toString()]);
+      Logger.error('handleDIDAttributeItemRevoked - no context, did: {}, context: {}', [did, event.params.value.toString()]);
     } else {
       let context = didEntify.context!;
       let found = false;
@@ -118,7 +119,7 @@ export function handleDIDAttributeItemRevoked(event: DIDAttributeItemRevokedEven
         didEntify.context = context;
         didEntify.save();
       } else {
-        Logger.error('context not found, did: {}, context: {}', [
+        Logger.error('handleDIDAttributeItemRevoked - context not found, did: {}, context: {}', [
           did,
           event.params.value.toString(),
         ]);
@@ -126,7 +127,7 @@ export function handleDIDAttributeItemRevoked(event: DIDAttributeItemRevokedEven
     }
   } else if (event.params.name == constants.ArrayAttributes.ALSO_KNOWN_AS) {
     if (didEntify.alsoKnownAs == null) {
-      Logger.error('no alsoKnownAs, did: {}, alsoKnownAs: {}', [
+      Logger.error('handleDIDAttributeItemRevoked - no alsoKnownAs, did: {}, alsoKnownAs: {}', [
         did,
         event.params.value.toString(),
       ]);
@@ -145,7 +146,7 @@ export function handleDIDAttributeItemRevoked(event: DIDAttributeItemRevokedEven
         didEntify.alsoKnownAs = alsoKnownAs;
         didEntify.save();
       } else {
-        Logger.error('alsoKnownAs not found, did: {}, alsoKnownAs: {}', [
+        Logger.error('handleDIDAttributeItemRevoked - alsoKnownAs not found, did: {}, alsoKnownAs: {}', [
           did,
           event.params.value.toString(),
         ]);
@@ -162,28 +163,28 @@ export function handleDIDAttributeItemRevoked(event: DIDAttributeItemRevokedEven
 
 export function handleDIDAttributeSet(event: DIDAttributeSetEvent): void {
   if (!constants.KvAttribute.has(event.params.name)) {
-    Logger.error('not expected kv attribute', [event.params.name]);
+    Logger.error('handleDIDAttributeSet - not expected kv attribute: {}', [event.params.name]);
     return;
   }
 
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did);
   if (!didEntify) {
-    Logger.error('did not found', [did]);
+    Logger.error('handleDIDAttributeSet - did not found: {}', [did]);
     return;
   }
 }
 
 export function handleDIDAttributeRevoked(event: DIDAttributeRevokedEvent): void {
   if (!constants.KvAttribute.has(event.params.name)) {
-    Logger.error('not expected kv attribute', [event.params.name]);
+    Logger.error('handleDIDAttributeSet - not expected kv attribute: {}', [event.params.name]);
     return;
   }
 
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did);
   if (!didEntify) {
-    Logger.error('did not found', [did]);
+    Logger.error('handleDIDAttributeSet - did not found: {}', [did]);
     return;
   }
 }
@@ -192,7 +193,7 @@ export function handleDIDControllerAdded(event: DIDControllerAddedEvent): void {
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did);
   if (!didEntify) {
-    Logger.error('did not found', [did]);
+    Logger.error('handleDIDControllerAdded - did not found: {}', [did]);
     return;
   }
 
@@ -207,7 +208,7 @@ export function handleDIDControllerRevoked(event: DIDControllerRevokedEvent): vo
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did);
   if (!didEntify) {
-    Logger.error('did not found', [did]);
+    Logger.error('handleDIDControllerRevoked - did not found: {}', [did]);
     return;
   }
 
@@ -216,7 +217,6 @@ export function handleDIDControllerRevoked(event: DIDControllerRevokedEvent): vo
   let found = false;
   for (let i = 0; i < controllers.length; i++) {
     if (controllers[i] == controller) {
-      Logger.info('controller removed, did: {}, controller: {}', [did, controller]);
       controllers.splice(i, 1);
       found = true;
       break;
@@ -224,7 +224,7 @@ export function handleDIDControllerRevoked(event: DIDControllerRevokedEvent): vo
   }
 
   if (!found) {
-    Logger.error('controller not found, did: {}, controller: {}', [did, controller]);
+    Logger.error('handleDIDControllerRevoked - controller not found, did: {}, controller: {}', [did, controller]);
     return;
   }
 
@@ -236,12 +236,12 @@ export function handleDIDOwnerChanged(event: DIDOwnerChangedEvent): void {
   let did = uint128ToDID(event.params.identifier);
   let didEntify = DIDDocument.load(did);
   if (!didEntify) {
-    Logger.error('did not found', [did]);
+    Logger.error('handleDIDOwnerChanged - did not found: {}', [did]);
     return;
   }
 
   if (didEntify.owner != event.params.oldOwner) {
-    Logger.error('old owner not match, current owner: {}, old owner: {}', [
+    Logger.error('handleDIDOwnerChanged - old owner not match, current owner: {}, old owner: {}', [
       didEntify.owner.toHexString(),
       event.params.oldOwner.toHexString(),
     ]);
