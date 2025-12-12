@@ -200,6 +200,7 @@ export function handleDIDControllerRevoked(
     return
   }
 
+  didEntify.controller = controllers
   didEntify.save()
 }
 

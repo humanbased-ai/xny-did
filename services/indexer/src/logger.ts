@@ -36,16 +36,16 @@ export class Logger {
 
   static info(message: string, args: string[]): void {
     Logger.backend.info(message, args)
-    log.info(message, args)
+    log.debug(message, args)
   }
 
   static warn(message: string, args: string[]): void {
     Logger.backend.warn(message, args)
-    log.warning(message, args)
+    log.debug(message, args)
   }
 
   static error(message: string, args: string[]): void {
     Logger.backend.error(message, args)
-    log.error(message, args)
+    log.debug(message, args)
   }
 }
