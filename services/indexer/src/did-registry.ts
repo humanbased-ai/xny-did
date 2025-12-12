@@ -188,7 +188,7 @@ export function handleDIDControllerRevoked(
   let found = false;
   for (let i = 0; i < controllers.length; i++) {
     if (controllers[i] == controller) {
-      log.info("controller removed, did: {}, controller: {}", [did, controller])
+      Logger.info("controller removed, did: {}, controller: {}", [did, controller])
       controllers.splice(i, 1)
       found = true;
       break

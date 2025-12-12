@@ -10,8 +10,8 @@ import {
 } from "matchstick-as/assembly/index"
 import { BigInt, Bytes, Address, log, json, Entity } from "@graphprotocol/graph-ts"
 import { DIDAttributeItemAdded as DIDAttributeItemAddedEvent } from "../generated/DIDRegistry/DIDRegistry"
-import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked, handleDIDAttributeItemRevoked, handleDIDControllerAdded, handleDIDControllerRevoked } from "../src/did-registry"
-import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent, createDIDAttributeItemRevokedEvent, createDIDControllerAddedEvent, createDIDControllerRevokedEvent } from "./did-registry-utils"
+import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked, handleDIDAttributeItemRevoked, handleDIDControllerAdded, handleDIDControllerRevoked, handleDIDOwnerChanged } from "../src/did-registry"
+import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent, createDIDAttributeItemRevokedEvent, createDIDControllerAddedEvent, createDIDControllerRevokedEvent, createDIDOwnerChangedEvent } from "./did-registry-utils"
 import { uint128ToDID } from "../src/utils"
 import { AssertionMethod, Authentication, CapabilityDelegation, CapabilityInvocation, DIDDocument, KeyAgreement, Service, SingleMethod, VerificationMethod } from "../generated/schema"
 import { Logger } from "../src/logger"
@@ -24,6 +24,7 @@ import {ArrayAttributes, KvAttribute} from "../src/constants"
 const identifier = BigInt.fromI32(234)
 const did = uint128ToDID(identifier)
 const owner = Address.fromBytes(Bytes.fromHexString("0x3db6B0550FBB3f84CD71859f2B5b16BA1a0fA67a"))
+const user = Address.fromBytes(Bytes.fromHexString("0xa7979603ffda569834b9bdf332f10a42a00d761c"))
 
 const stringValue = "string value"
 const didValue = did
@@ -837,7 +838,6 @@ describe("Array Attribute revoked", () => {
             let entity: Entity | null = null
             if (name == ArrayAttributes.VERIFICATION_METHOD) {
                 let id = `${did}#vm_0`
-                log.debug(" VERIFICATION_METHOD id, {}", [id])
                 entity = VerificationMethod.load(id)
             } else if (name == ArrayAttributes.AUTHENTICATION) {
                 let id = `${did}#auth_0`
@@ -923,7 +923,7 @@ describe("DIDControllerAdded", () => {
   })
 })
 
-describe("DIDControllerAdded", () => {
+describe("DIDControllerRevoked", () => {
   beforeAll(() => {
   })
   
@@ -984,5 +984,60 @@ describe("DIDControllerAdded", () => {
     document = DIDDocument.load(did);
     assert.assertNotNull(document, "document should not be null");
     assert.assertTrue(document!.controller.length == 1, "controller length not 1");
+  })
+})
+
+describe("DIDOwnerChanged", () => {
+  beforeAll(() => {
+  })
+  
+  afterAll(() => {
+    clearStore()
+  })
+
+  test("DIDOwnerChanged failed with did not found", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    let newEvent = createDIDOwnerChangedEvent(
+      identifier,
+      owner,
+      user
+    )
+    handleDIDOwnerChanged(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("did not found") as boolean)
+  })
+
+  test("DIDOwnerChanged failed with old owner not match", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    registerDID()
+
+    let newEvent = createDIDOwnerChangedEvent(
+      identifier,
+      user,
+      user
+    )
+    handleDIDOwnerChanged(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("old owner not match") as boolean)
+  })
+
+  test("DIDOwnerChanged should pass", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    registerDID()
+
+    let newEvent = createDIDOwnerChangedEvent(
+      identifier,
+      owner,
+      user
+    )
+    handleDIDOwnerChanged(newEvent)
+    
+    let document = DIDDocument.load(did);
+    assert.assertNotNull(document, "document should not be null");
+    assert.assertTrue(document!.owner == user, "change owner failed");
   })
 })
