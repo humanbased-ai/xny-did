@@ -81,7 +81,51 @@ export function handleDIDAttributeItemRevoked(
     return;
   }
 
-  ArrayAttributeHandler.removeArrayAttributeEntity(did, event.params.name, event.params.index.toString())
+  if (event.params.name == constants.ArrayAttributes.CONTEXT) {
+    if (didEntify.context == null) {
+      Logger.error("no context, did: {}, context: {}", [did, event.params.value.toString()])
+    } else {
+      let context = didEntify.context!;
+      let found = false;
+      for (let i = 0; i < context.length; i++) {
+        if (context.at(i) == event.params.value.toString()) {
+          found = true;
+          context.splice(i, 1);
+          break;
+        }
+      }
+
+      if (found) {
+        didEntify.context = context;
+        didEntify.save()
+      } else {
+        Logger.error("context not found, did: {}, context: {}", [did, event.params.value.toString()])
+      }
+    }
+  } else if (event.params.name == constants.ArrayAttributes.ALSO_KNOWN_AS) {
+    if (didEntify.alsoKnownAs == null) {
+      Logger.error("no alsoKnownAs, did: {}, alsoKnownAs: {}", [did, event.params.value.toString()])
+    } else {
+      let alsoKnownAs = didEntify.alsoKnownAs!;
+      let found = false;
+      for (let i = 0; i < alsoKnownAs.length; i++) {
+        if (alsoKnownAs.at(i) == event.params.value.toString()) {
+          found = true;
+          alsoKnownAs.splice(i, 1);
+          break;
+        }
+      }
+
+      if (found) {
+        didEntify.alsoKnownAs = alsoKnownAs;
+        didEntify.save()
+      } else {
+        Logger.error("alsoKnownAs not found, did: {}, alsoKnownAs: {}", [did, event.params.value.toString()])
+      }
+    }
+  } else {
+    ArrayAttributeHandler.removeArrayAttributeEntity(did, event.params.name, event.params.index.toString())
+  }
 }
 
 export function handleDIDAttributeSet(event: DIDAttributeSetEvent): void {
