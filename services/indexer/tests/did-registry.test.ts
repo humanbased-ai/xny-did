@@ -10,8 +10,8 @@ import {
 } from "matchstick-as/assembly/index"
 import { BigInt, Bytes, Address, log, json, Entity } from "@graphprotocol/graph-ts"
 import { DIDAttributeItemAdded as DIDAttributeItemAddedEvent } from "../generated/DIDRegistry/DIDRegistry"
-import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked, handleDIDAttributeItemRevoked, handleDIDControllerAdded } from "../src/did-registry"
-import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent, createDIDAttributeItemRevokedEvent, createDIDControllerAddedEvent } from "./did-registry-utils"
+import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked, handleDIDAttributeItemRevoked, handleDIDControllerAdded, handleDIDControllerRevoked } from "../src/did-registry"
+import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent, createDIDAttributeItemRevokedEvent, createDIDControllerAddedEvent, createDIDControllerRevokedEvent } from "./did-registry-utils"
 import { uint128ToDID } from "../src/utils"
 import { AssertionMethod, Authentication, CapabilityDelegation, CapabilityInvocation, DIDDocument, KeyAgreement, Service, SingleMethod, VerificationMethod } from "../generated/schema"
 import { Logger } from "../src/logger"
@@ -904,7 +904,7 @@ describe("DIDControllerAdded", () => {
     assert.assertTrue(testLogger.messages.pop().includes("did not found") as boolean)
   })
 
-  test("DIDControllerAdded failed with did not found", () => {
+  test("DIDControllerAdded should pass", () => {
     const testLogger = new TestLoggerBackend()
     Logger.backend = testLogger
 
@@ -920,5 +920,69 @@ describe("DIDControllerAdded", () => {
     let document = DIDDocument.load(did);
     assert.assertNotNull(document, "document should not be null");
     assert.assertTrue(document!.controller.length == 2, "controller length not 2");
+  })
+})
+
+describe("DIDControllerAdded", () => {
+  beforeAll(() => {
+  })
+  
+  afterAll(() => {
+    clearStore()
+  })
+
+  test("DIDControllerRevoked failed with did not found", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    let newEvent = createDIDControllerRevokedEvent(
+      identifier,
+      identifier,
+      identifier
+    )
+    handleDIDControllerRevoked(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("did not found") as boolean)
+  })
+
+  test("DIDControllerRevoked failed with controller not found", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    registerDID()
+
+    let newEvent = createDIDControllerRevokedEvent(
+      identifier,
+      identifier,
+      BigInt.fromI32(235)
+    )
+    handleDIDControllerRevoked(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("controller not found") as boolean)
+  })
+
+  test("DIDControllerRevoked should pass", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    registerDID()
+
+    let addEvent = createDIDControllerAddedEvent(
+      identifier,
+      identifier,
+      BigInt.fromI32(235)
+    )
+    handleDIDControllerAdded(addEvent)
+
+    let document = DIDDocument.load(did);
+
+    let newEvent = createDIDControllerRevokedEvent(
+      identifier,
+      identifier,
+      BigInt.fromI32(235)
+    )
+    handleDIDControllerRevoked(newEvent)
+    
+    document = DIDDocument.load(did);
+    assert.assertNotNull(document, "document should not be null");
+    assert.assertTrue(document!.controller.length == 1, "controller length not 1");
   })
 })
