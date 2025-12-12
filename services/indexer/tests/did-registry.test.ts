@@ -8,15 +8,15 @@ import {
   beforeEach,
   afterEach
 } from "matchstick-as/assembly/index"
-import { BigInt, Bytes, Address, log, json } from "@graphprotocol/graph-ts"
+import { BigInt, Bytes, Address, log, json, Entity } from "@graphprotocol/graph-ts"
 import { DIDAttributeItemAdded as DIDAttributeItemAddedEvent } from "../generated/DIDRegistry/DIDRegistry"
-import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked } from "../src/did-registry"
-import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent } from "./did-registry-utils"
+import { handleDIDAttributeItemAdded, handleDIDRegistered, handleDIDAttributeSet, handleDIDAttributeRevoked, handleDIDAttributeItemRevoked, handleDIDControllerAdded } from "../src/did-registry"
+import { createDIDAttributeItemAddedEvent, createDIDRegisteredEvent, createDIDAttributeSetEvent, createDIDAttributeRevokedEvent, createDIDAttributeItemRevokedEvent, createDIDControllerAddedEvent } from "./did-registry-utils"
 import { uint128ToDID } from "../src/utils"
-import { Authentication, DIDDocument, Service, SingleMethod, VerificationMethod } from "../generated/schema"
+import { AssertionMethod, Authentication, CapabilityDelegation, CapabilityInvocation, DIDDocument, KeyAgreement, Service, SingleMethod, VerificationMethod } from "../generated/schema"
 import { Logger } from "../src/logger"
 import {TestLoggerBackend} from "./logger"
-import {KvAttribute} from "../src/constants"
+import {ArrayAttributes, KvAttribute} from "../src/constants"
 
 // Tests structure (matchstick-as >=0.5.0)
 // https://thegraph.com/docs/en/subgraphs/developing/creating/unit-testing-framework/#tests-structure
@@ -34,6 +34,23 @@ function registerDID(): void {
     owner
   )
   handleDIDRegistered(newDIDRegisteredEvent)
+}
+
+function addArrayAttribute(name: string): void {
+  let value = Bytes.fromUTF8('{"type":"123","controller":"123"}')
+  if (name == ArrayAttributes.CONTEXT || name == ArrayAttributes.ALSO_KNOWN_AS) {
+    value = Bytes.fromUTF8(stringValue)
+  } else if (name == ArrayAttributes.SERVICE) {
+    value = Bytes.fromUTF8('{"type":"123","serviceEndpoint":"serviceEndpoint"}')
+  }
+  let newEvent = createDIDAttributeItemAddedEvent(
+    identifier,
+    identifier,
+    name,
+    BigInt.fromString("0"),
+    value
+  )
+  handleDIDAttributeItemAdded(newEvent)
 }
 
 // describe("DID Registered", () => {
@@ -626,5 +643,282 @@ describe("Array Attribute added", () => {
       assert.assertTrue(entity!.type == "123", "type error")
       assert.assertTrue(entity!.serviceEndpoint == Bytes.fromUTF8('{"type":"123","serviceEndpoint":"serviceEndpoint"}'), "type serviceEndpoint")
     })
+  })
+})
+
+describe("Array Attribute revoked", () => {
+  afterAll(() => {
+    clearStore()
+  })
+
+  test("DIDAttributeItemRevoked failed with name error", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    let newEvent = createDIDAttributeItemRevokedEvent(
+      identifier,
+      identifier,
+      "wrong",
+      BigInt.fromString("0"),
+      Bytes.empty()
+    )
+    handleDIDAttributeItemRevoked(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("not expected array attribute") as boolean)
+  })
+
+  test("DIDAttributeItemRevoked failed with did not found", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    let newEvent = createDIDAttributeItemRevokedEvent(
+      identifier,
+      identifier,
+      "authentication",
+      BigInt.fromString("0"),
+      Bytes.empty()
+    )
+    handleDIDAttributeItemRevoked(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("did not found") as boolean)
+  })
+
+  describe("Context", () => {
+    beforeEach(() => {
+      registerDID()
+    })
+
+    afterEach(() => {
+      clearStore()
+    })
+
+    test("context is null", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemRevokedEvent(
+        identifier,
+        identifier,
+        "@context",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+
+      handleDIDAttributeItemRevoked(newEvent)
+      
+      assert.assertTrue(testLogger.messages.pop().includes("no context") as boolean)
+    })
+
+    test("context not found", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+
+      addArrayAttribute("@context")
+      
+      let newEvent = createDIDAttributeItemRevokedEvent(
+        identifier,
+        identifier,
+        "@context",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue + "0")
+      )
+
+      handleDIDAttributeItemRevoked(newEvent)
+      
+      assert.assertTrue(testLogger.messages.pop().includes("context not found") as boolean)
+    })
+
+    test("context found", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+
+      addArrayAttribute("@context")
+      
+      let newEvent = createDIDAttributeItemRevokedEvent(
+        identifier,
+        identifier,
+        "@context",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+
+      handleDIDAttributeItemRevoked(newEvent)
+      
+      let document = DIDDocument.load(did);
+      assert.assertNotNull(document, "document should not be null");
+      assert.assertTrue(document!.context!.length == 0, "context length not 0");
+    })
+  })
+
+  describe("Also known as", () => {
+    beforeEach(() => {
+      registerDID()
+    })
+
+    afterEach(() => {
+      clearStore()
+    })
+
+    test("alsoKnownAs is null", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+      
+      let newEvent = createDIDAttributeItemRevokedEvent(
+        identifier,
+        identifier,
+        "alsoKnownAs",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+
+      handleDIDAttributeItemRevoked(newEvent)
+      
+      assert.assertTrue(testLogger.messages.pop().includes("no alsoKnownAs") as boolean)
+    })
+
+    test("alsoKnownAs not found", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+
+      addArrayAttribute("alsoKnownAs")
+      
+      let newEvent = createDIDAttributeItemRevokedEvent(
+        identifier,
+        identifier,
+        "alsoKnownAs",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue + "0")
+      )
+
+      handleDIDAttributeItemRevoked(newEvent)
+      
+      assert.assertTrue(testLogger.messages.pop().includes("alsoKnownAs not found") as boolean)
+    })
+
+    test("alsoKnownAs found", () => {
+      const testLogger = new TestLoggerBackend()
+      Logger.backend = testLogger
+
+      addArrayAttribute("alsoKnownAs")
+      
+      let newEvent = createDIDAttributeItemRevokedEvent(
+        identifier,
+        identifier,
+        "alsoKnownAs",
+        BigInt.fromString("0"),
+        Bytes.fromUTF8(stringValue)
+      )
+
+      handleDIDAttributeItemRevoked(newEvent)
+      
+      let document = DIDDocument.load(did);
+      assert.assertNotNull(document, "document should not be null");
+      assert.assertTrue(document!.alsoKnownAs!.length == 0, "alsoKnownAs length not 0");
+    })
+  })
+  
+    describe("Other array attributes", () => {
+      test("revoking works", () => {
+        const cases = [
+          "verificationMethod",
+          "authentication",
+          "assertionMethod",
+          "keyAgreement",
+          "capabilityInvocation",
+          "capabilityDelegation",
+          "service"
+        ];
+
+        for (let i = 0; i < cases.length; i++) {
+          clearStore()
+          registerDID()
+          
+          let name = cases[i]
+
+          function getEntity(name: string): Entity | null {
+            let entity: Entity | null = null
+            if (name == ArrayAttributes.VERIFICATION_METHOD) {
+                let id = `${did}#vm_0`
+                log.debug(" VERIFICATION_METHOD id, {}", [id])
+                entity = VerificationMethod.load(id)
+            } else if (name == ArrayAttributes.AUTHENTICATION) {
+                let id = `${did}#auth_0`
+                entity = Authentication.load(id)
+            } else if (name == ArrayAttributes.ASSERTION_METHOD) {
+                let id = `${did}#am_0`
+                entity = AssertionMethod.load(id)
+            } else if (name == ArrayAttributes.KEY_AGREEMENT) {
+                let id = `${did}#ka_0`
+                entity = KeyAgreement.load(id)
+            } else if (name == ArrayAttributes.CAPABILITY_INVOCATION) {
+                let id = `${did}#ci_0`
+                entity = CapabilityInvocation.load(id)
+            } else if (name == ArrayAttributes.CAPABILITY_DELEGATION) {
+                let id = `${did}#cd_0`
+                entity = CapabilityDelegation.load(id)
+            } else if (name == ArrayAttributes.SERVICE) {
+                let id = `${did}#service_0`
+                entity = Service.load(id)
+            }
+            return entity
+          }
+
+          addArrayAttribute(name)
+
+          let entity = getEntity(name)
+          assert.assertNotNull(entity, "entity should not be null");
+          
+          let newEvent = createDIDAttributeItemRevokedEvent(
+            identifier,
+            identifier,
+            name,
+            BigInt.fromString("0"),
+            Bytes.fromUTF8(stringValue)
+          )
+
+          handleDIDAttributeItemRevoked(newEvent)
+
+          entity = getEntity(name)
+          assert.assertNull(entity, "entity should be null");
+        }
+      })
+    })
+})
+
+describe("DIDControllerAdded", () => {
+  beforeAll(() => {
+  })
+  
+  afterAll(() => {
+    clearStore()
+  })
+
+  test("DIDControllerAdded failed with did not found", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    let newEvent = createDIDControllerAddedEvent(
+      identifier,
+      identifier,
+      identifier
+    )
+    handleDIDControllerAdded(newEvent)
+    assert.assertTrue(testLogger.messages.pop().includes("did not found") as boolean)
+  })
+
+  test("DIDControllerAdded failed with did not found", () => {
+    const testLogger = new TestLoggerBackend()
+    Logger.backend = testLogger
+
+    registerDID()
+
+    let newEvent = createDIDControllerAddedEvent(
+      identifier,
+      identifier,
+      identifier
+    )
+    handleDIDControllerAdded(newEvent)
+    
+    let document = DIDDocument.load(did);
+    assert.assertNotNull(document, "document should not be null");
+    assert.assertTrue(document!.controller.length == 2, "controller length not 2");
   })
 })
