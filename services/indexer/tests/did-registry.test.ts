@@ -536,6 +536,28 @@ describe('Array Attribute added', () => {
       clearStore();
     });
 
+    test('value is an abi encoded uint256', () => {
+      const testLogger = new TestLoggerBackend();
+      Logger.backend = testLogger;
+
+      let newEvent = createDIDAttributeItemAddedEvent(
+        identifier,
+        identifier,
+        'authentication',
+        BigInt.fromString('0'),
+        Bytes.fromUTF8("1"),
+      );
+
+      handleDIDAttributeItemAdded(newEvent);
+      let id = `${did}#auth_0`;
+      let uri = `${did}#vm_1`
+      let entity = Authentication.load(id);
+      assert.assertNotNull(entity, 'entity should not be null');
+      assert.assertTrue(entity!.id! == id, 'id not match');
+      assert.assertTrue(entity!.uri! == uri, 'uri error');
+      assert.assertNull(entity!.method, 'method should be null');
+    });
+
     test('value is string but not a did', () => {
       const testLogger = new TestLoggerBackend();
       Logger.backend = testLogger;

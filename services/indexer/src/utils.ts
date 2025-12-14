@@ -1,4 +1,4 @@
-import { BigInt, Entity, JSONValue } from '@graphprotocol/graph-ts';
+import { BigInt, Bytes, Entity, JSONValue } from '@graphprotocol/graph-ts';
 
 export function uint128ToUUID(value: BigInt): string {
   // 定义 128 位最大值 (2^128 - 1)
@@ -59,5 +59,18 @@ export function isValidDID(did: string): boolean {
     }
   }
 
+  return true;
+}
+
+export function isNumericString(s: string): boolean {
+  let len = s.length;
+  if (len == 0) return false;
+
+  for (let i = 0; i < len; i++) {
+    let c = s.charCodeAt(i);
+    if (c < 48 || c > 57) { // '0' = 48, '9' = 57
+      return false;
+    }
+  }
   return true;
 }

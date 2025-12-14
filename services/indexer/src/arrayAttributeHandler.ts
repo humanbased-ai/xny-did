@@ -208,11 +208,15 @@ function getAuthParams(
       return { id, uri: null, method: method.id };
     }
   } else {
-    if (!utils.isValidDID(value.toString())) {
+    let valueString = value.toString();
+    if (utils.isNumericString(valueString)) {
+        let uri = `${did}#vm_${valueString}`;
+        return { id, uri, method: null };
+    } else if (utils.isValidDID(valueString)) {
+      return { id, uri: valueString, method: null };
+    } else {
       Logger.error('getAuthParams - not a valid did: {}', [value.toHexString()]);
       return null;
-    } else {
-      return { id, uri: value.toString(), method: null };
     }
   }
 }
