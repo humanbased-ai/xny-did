@@ -68,7 +68,8 @@ export function isNumericString(s: string): boolean {
 
   for (let i = 0; i < len; i++) {
     let c = s.charCodeAt(i);
-    if (c < 48 || c > 57) { // '0' = 48, '9' = 57
+    if (c < 48 || c > 57) {
+      // '0' = 48, '9' = 57
       return false;
     }
   }

@@ -545,12 +545,12 @@ describe('Array Attribute added', () => {
         identifier,
         'authentication',
         BigInt.fromString('0'),
-        Bytes.fromUTF8("1"),
+        Bytes.fromUTF8('1'),
       );
 
       handleDIDAttributeItemAdded(newEvent);
       let id = `${did}#auth_0`;
-      let uri = `${did}#vm_1`
+      let uri = `${did}#vm_1`;
       let entity = Authentication.load(id);
       assert.assertNotNull(entity, 'entity should not be null');
       assert.assertTrue(entity!.id! == id, 'id not match');

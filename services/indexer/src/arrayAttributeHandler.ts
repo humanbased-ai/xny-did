@@ -177,7 +177,6 @@ function getAuthParams(
     // parse value
     let result = json.try_fromBytes(value);
     if (result.isError) {
-      Logger.error('addSingleMethod - can not parse value {} as json', [value.toHexString()]);
       return null;
     }
 
@@ -185,7 +184,6 @@ function getAuthParams(
 
     // origin value data should be an object
     if (jsonValue.kind != JSONValueKind.OBJECT) {
-      Logger.error('addSingleMethod - the origin value is not an object', []);
       return null;
     }
 
@@ -210,8 +208,8 @@ function getAuthParams(
   } else {
     let valueString = value.toString();
     if (utils.isNumericString(valueString)) {
-        let uri = `${did}#vm_${valueString}`;
-        return { id, uri, method: null };
+      let uri = `${did}#vm_${valueString}`;
+      return { id, uri, method: null };
     } else if (utils.isValidDID(valueString)) {
       return { id, uri: valueString, method: null };
     } else {
