@@ -11,17 +11,7 @@ import {
   OwnershipTransferred as OwnershipTransferredEvent,
   Upgraded as UpgradedEvent,
 } from '../generated/DIDRegistry/DIDRegistry';
-import {
-  DIDDocument,
-  SingleMethod,
-  VerificationMethod,
-  Authentication,
-  AssertionMethod,
-  KeyAgreement,
-  CapabilityInvocation,
-  CapabilityDelegation,
-  Service,
-} from '../generated/schema';
+import { DIDDocument, Upgraded, Initialized } from '../generated/schema';
 import { uint128ToUUID, uint128ToDID } from './utils';
 import * as constants from './constants';
 import { log } from '@graphprotocol/graph-ts';
@@ -274,23 +264,19 @@ export function handleDIDRegistered(event: DIDRegisteredEvent): void {
 }
 
 export function handleInitialized(event: InitializedEvent): void {
-  // let entity = new Initialized(
-  //   event.transaction.hash.concatI32(event.logIndex.toI32())
-  // )
-  // entity.version = event.params.version
-  // entity.blockNumber = event.block.number
-  // entity.blockTimestamp = event.block.timestamp
-  // entity.transactionHash = event.transaction.hash
-  // entity.save()
+  let entity = new Initialized(event.transaction.hash.concatI32(event.logIndex.toI32()));
+  entity.version = event.params.version;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
 }
 
 export function handleUpgraded(event: UpgradedEvent): void {
-  // let entity = new Upgraded(
-  //   event.transaction.hash.concatI32(event.logIndex.toI32())
-  // )
-  // entity.implementation = event.params.implementation
-  // entity.blockNumber = event.block.number
-  // entity.blockTimestamp = event.block.timestamp
-  // entity.transactionHash = event.transaction.hash
-  // entity.save()
+  let entity = new Upgraded(event.transaction.hash.concatI32(event.logIndex.toI32()));
+  entity.implementation = event.params.implementation;
+  entity.blockNumber = event.block.number;
+  entity.blockTimestamp = event.block.timestamp;
+  entity.transactionHash = event.transaction.hash;
+  entity.save();
 }

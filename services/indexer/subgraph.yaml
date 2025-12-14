@@ -6,11 +6,11 @@ schema:
 dataSources:
   - kind: ethereum
     name: DIDRegistry
-    network: mainnet
+    network: base-sepolia
     source:
-      address: "0x3DB4e80aE23AF99BA2a92Aa54E204c03766ce562"
+      address: "0x49bc9d93B52367b9Fc173C5bA206d0202A89643a"
       abi: DIDRegistry
-      startBlock: 37759471
+      startBlock: 34957425
     mapping:
       kind: ethereum/events
       apiVersion: 0.0.9
@@ -25,6 +25,8 @@ dataSources:
         - CapabilityDelegation
         - Service
         - DIDDocument
+        - Initialized
+        - Upgraded
       abis:
         - name: DIDRegistry
           file: ./abis/DIDRegistry.json
