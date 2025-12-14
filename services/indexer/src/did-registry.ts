@@ -32,7 +32,10 @@ export function handleDIDAttributeItemAdded(event: DIDAttributeItemAddedEvent): 
   let did = uint128ToDID(event.params.identifier);
 
   if (!constants.ArrayAttributeSet.has(event.params.name)) {
-    Logger.error('handleDIDAttributeItemAdded - not expected array attribute: did: {}, name: {}', [did, event.params.name]);
+    Logger.error('handleDIDAttributeItemAdded - not expected array attribute: did: {}, name: {}', [
+      did,
+      event.params.name,
+    ]);
     return;
   }
 
@@ -49,10 +52,10 @@ export function handleDIDAttributeItemAdded(event: DIDAttributeItemAddedEvent): 
       let context = didEntify.context!;
       for (let i = 0; i < context.length; i++) {
         if (context[i] == event.params.value.toString()) {
-          Logger.error('handleDIDAttributeItemAdded - context already exists, did: {}, controller: {}', [
-            did,
-            event.params.value.toString(),
-          ]);
+          Logger.error(
+            'handleDIDAttributeItemAdded - context already exists, did: {}, controller: {}',
+            [did, event.params.value.toString()],
+          );
           return;
         }
       }
@@ -67,10 +70,10 @@ export function handleDIDAttributeItemAdded(event: DIDAttributeItemAddedEvent): 
       let alsoKnownAs = didEntify.alsoKnownAs!;
       for (let i = 0; i < alsoKnownAs.length; i++) {
         if (alsoKnownAs[i] == event.params.value.toString()) {
-          Logger.error('handleDIDAttributeItemAdded - alsoKnownAs already exists, did: {}, alsoKnownAs: {}', [
-            did,
-            event.params.value.toString(),
-          ]);
+          Logger.error(
+            'handleDIDAttributeItemAdded - alsoKnownAs already exists, did: {}, alsoKnownAs: {}',
+            [did, event.params.value.toString()],
+          );
           return;
         }
       }
@@ -90,7 +93,9 @@ export function handleDIDAttributeItemAdded(event: DIDAttributeItemAddedEvent): 
 
 export function handleDIDAttributeItemRevoked(event: DIDAttributeItemRevokedEvent): void {
   if (!constants.ArrayAttributeSet.has(event.params.name)) {
-    Logger.error('handleDIDAttributeItemRevoked - not expected array attribute: {}', [event.params.name]);
+    Logger.error('handleDIDAttributeItemRevoked - not expected array attribute: {}', [
+      event.params.name,
+    ]);
     return;
   }
 
@@ -103,7 +108,10 @@ export function handleDIDAttributeItemRevoked(event: DIDAttributeItemRevokedEven
 
   if (event.params.name == constants.ArrayAttributes.CONTEXT) {
     if (didEntify.context == null) {
-      Logger.error('handleDIDAttributeItemRevoked - no context, did: {}, context: {}', [did, event.params.value.toString()]);
+      Logger.error('handleDIDAttributeItemRevoked - no context, did: {}, context: {}', [
+        did,
+        event.params.value.toString(),
+      ]);
     } else {
       let context = didEntify.context!;
       let found = false;
@@ -146,10 +154,10 @@ export function handleDIDAttributeItemRevoked(event: DIDAttributeItemRevokedEven
         didEntify.alsoKnownAs = alsoKnownAs;
         didEntify.save();
       } else {
-        Logger.error('handleDIDAttributeItemRevoked - alsoKnownAs not found, did: {}, alsoKnownAs: {}', [
-          did,
-          event.params.value.toString(),
-        ]);
+        Logger.error(
+          'handleDIDAttributeItemRevoked - alsoKnownAs not found, did: {}, alsoKnownAs: {}',
+          [did, event.params.value.toString()],
+        );
       }
     }
   } else {
@@ -197,7 +205,7 @@ export function handleDIDControllerAdded(event: DIDControllerAddedEvent): void {
     return;
   }
 
-  let controller = didEntify.controller!;
+  let controller = didEntify.controller;
   controller.push(uint128ToDID(event.params.controller));
   didEntify.controller = controller;
 
@@ -224,7 +232,10 @@ export function handleDIDControllerRevoked(event: DIDControllerRevokedEvent): vo
   }
 
   if (!found) {
-    Logger.error('handleDIDControllerRevoked - controller not found, did: {}, controller: {}', [did, controller]);
+    Logger.error('handleDIDControllerRevoked - controller not found, did: {}, controller: {}', [
+      did,
+      controller,
+    ]);
     return;
   }
 

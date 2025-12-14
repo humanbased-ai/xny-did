@@ -74,22 +74,8 @@ function addSingleMethod(
   parentType: string,
   index: string,
   value: Bytes,
+  jsonValue: JSONValue,
 ): SingleMethod | null {
-  // parse value
-  let result = json.try_fromBytes(value);
-  if (result.isError) {
-    Logger.error('addSingleMethod - can not parse value {} as json', [value.toHexString()]);
-    return null;
-  }
-
-  let jsonValue = result.value;
-
-  // origin value data should be an object
-  if (jsonValue.kind != JSONValueKind.OBJECT) {
-    Logger.error('addSingleMethod - the origin value is not an object', []);
-    return null;
-  }
-
   let jsonObject = jsonValue.toObject();
 
   // type MUST exist
@@ -124,7 +110,9 @@ function addSingleMethod(
       let idValue: BigInt = BigInt.fromString(controllerJsonValue.toString());
       controllerValue = utils.uint128ToDID(idValue);
     } else {
-      Logger.error('addSingleMethod - type of controller error: {}', [controllerJsonValue.kind.toString()]);
+      Logger.error('addSingleMethod - type of controller error: {}', [
+        controllerJsonValue.kind.toString(),
+      ]);
       return null;
     }
   }
@@ -142,8 +130,22 @@ function addSingleMethod(
 }
 
 function addVerificationMethod(did: string, index: string, value: Bytes): void {
+  // parse value
+  let result = json.try_fromBytes(value);
+  if (result.isError) {
+    Logger.error('addSingleMethod - can not parse value {} as json', [value.toHexString()]);
+    return;
+  }
+
+  let jsonValue = result.value;
+
+  // origin value data should be an object
+  if (jsonValue.kind != JSONValueKind.OBJECT) {
+    Logger.error('addSingleMethod - the origin value is not an object', []);
+    return;
+  }
   let id = `${did}#vm_${index}`;
-  let method = addSingleMethod(did, id, 'VerificationMethod', index, value);
+  let method = addSingleMethod(did, id, 'VerificationMethod', index, value, jsonValue);
 
   if (method == null) {
     return;
@@ -171,18 +173,47 @@ function getAuthParams(
   index: string,
   value: Bytes,
 ): AuthParam | null {
+  function getObjectParam(value: Bytes): JSONValue | null {
+    // parse value
+    let result = json.try_fromBytes(value);
+    if (result.isError) {
+      Logger.error('addSingleMethod - can not parse value {} as json', [value.toHexString()]);
+      return null;
+    }
+
+    let jsonValue = result.value;
+
+    // origin value data should be an object
+    if (jsonValue.kind != JSONValueKind.OBJECT) {
+      Logger.error('addSingleMethod - the origin value is not an object', []);
+      return null;
+    }
+
+    return result.value;
+  }
+
   let id = `${did}#${authPrefix}_${index}`;
+  let result = getObjectParam(value);
   // object first
-  let method = addSingleMethod(did, id, name, index, value);
-  if (method == null) {
+  if (result != null) {
+    let method = addSingleMethod(did, id, name, index, value, result);
+    if (method == null) {
+      Logger.error('getAuthParams - addSingleMethod failed: did: {}, id: {}, name: {}', [
+        did,
+        id,
+        name,
+      ]);
+      return null;
+    } else {
+      return { id, uri: null, method: method.id };
+    }
+  } else {
     if (!utils.isValidDID(value.toString())) {
       Logger.error('getAuthParams - not a valid did: {}', [value.toHexString()]);
       return null;
     } else {
       return { id, uri: value.toString(), method: null };
     }
-  } else {
-    return { id, uri: null, method: method.id };
   }
 }
 
@@ -281,7 +312,9 @@ function addService(did: string, index: string, value: Bytes): void {
   }
 
   if (typeJsonValue.kind != JSONValueKind.STRING) {
-    Logger.error('addService - type of service type not string: {}', [typeJsonValue.kind.toString()]);
+    Logger.error('addService - type of service type not string: {}', [
+      typeJsonValue.kind.toString(),
+    ]);
     return;
   }
 

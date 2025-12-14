@@ -4,11 +4,12 @@
   "scripts": {
     "codegen": "graph codegen",
     "build": "graph build",
+    "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
     "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ codatta-indexer",
     "create-local": "graph create --node http://localhost:8020/ codatta-indexer",
     "remove-local": "graph remove --node http://localhost:8020/ codatta-indexer",
     "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 codatta-indexer",
-    "test": "graph test"
+    "test": "graph test -d"
   },
   "dependencies": {
     "@graphprotocol/graph-cli": "0.98.1",
