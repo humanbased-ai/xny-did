@@ -1,4 +1,4 @@
 {
-  "RPC_URL": "https://rpc-testnet.gokite.ai/",
-  "CONTRACT_ADDRESS": "0x9704E3ffFE0c18f5C46795b4fB9148e05cB88A92"
+  "GRAPH_URL": "https://",
+  "GRAPH_ACCESS_TOKEN": "YOUR_GRAPH_ACCESS_TOKEN"
 }

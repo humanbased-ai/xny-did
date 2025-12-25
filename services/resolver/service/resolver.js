@@ -1,85 +1,106 @@
 const ethers = require('ethers');
 const config = require('config');
-const { toBigInt, fromBigInt } = require('../utils/did-parser');
 
 class Resolver {
   /**
    * Constructor
-   * @param {string} rpcUrl - The chain node RPC URL
-   * @param {string} contractAddress - DIDRegistry contract address
-   * @param {object} abi - contract ABI
+   * @param {string} graphUrl - The Graph API URL
+   * @param {string} accessToken - The Authorization token
    */
-  constructor(rpcUrl, contractAddress, abi) {
-    this.provider = new ethers.JsonRpcProvider(rpcUrl);
-    this.contract = new ethers.Contract(contractAddress, abi, this.provider);
+  constructor(graphUrl, accessToken) {
+    this.graphUrl = graphUrl;
+    this.accessToken = accessToken;
   }
 
   /**
-   * Query the DID Document on the chain
-   * @param {string | number} identifier - The DID to query
+   * Query the DID Document from The Graph
+   * @param {string} identifier - The DID to query
    * @returns {Promise<object>} - The resolved DID Document object
    */
   async resolve(identifier) {
     try {
-      var identifierUint128 = toBigInt(identifier);
-      var document = {};
-      var result = await this.contract.getDidDocument(identifierUint128);
-      if (result.owner === ethers.ZeroAddress) {
+      const query = `query($didId: ID!) { diddocument(id: $didId) { id owner controllers: controller verificationMethod { id method { id type value } } alsoKnownAs authentication { id uri } assertionMethod { id uri } keyAgreement { id uri } capabilityInvocation { id uri } capabilityDelegation { id uri } service { id type serviceEndpoint } } }`;
+
+      const req = new ethers.FetchRequest(this.graphUrl);
+      req.method = 'POST';
+      req.setHeader('Content-Type', 'application/json');
+      req.setHeader('Authorization', this.accessToken);
+      req.body = {
+        query: query,
+        variables: { didId: identifier },
+      };
+
+      const response = await req.send();
+      const result = response.bodyJson;
+
+      if (result.errors) {
+        throw new Error(result.errors.map((e) => e.message).join(', '));
+      }
+
+      const didDoc = result.data.diddocument;
+      if (!didDoc) {
         throw new Error(`DID Document not found for identifier: ${identifier}`);
       }
-      document.id = identifier;
-      document.owner = result.owner;
-      document.controllers = [];
-      for (const controller of result.controller) { 
-        document.controllers.push(fromBigInt(controller));
+
+      const document = {
+        '@context': ['https://www.w3.org/ns/did/v1'],
+        id: didDoc.id,
+        controller: didDoc.controllers,
+        owner: didDoc.owner,
+      };
+
+      if (didDoc.alsoKnownAs) {
+        document.alsoKnownAs = didDoc.alsoKnownAs;
       }
-      var attributes = this.parseAttributes(result);
-      Object.assign(document, attributes);
+
+      if (didDoc.verificationMethod) {
+        document.verificationMethod = didDoc.verificationMethod.map((vm) => {
+          let methodDetails = {};
+          try {
+            if (vm.method.value && vm.method.value.startsWith('0x')) {
+              methodDetails = JSON.parse(ethers.toUtf8String(vm.method.value));
+            }
+          } catch (e) {
+            console.warn('Error decoding verification method value', e);
+          }
+          return {
+            id: vm.id,
+            type: vm.method.type,
+            controller: didDoc.id,
+            ...methodDetails,
+          };
+        });
+      }
+
+      const relations = [
+        'authentication',
+        'assertionMethod',
+        'keyAgreement',
+        'capabilityInvocation',
+        'capabilityDelegation',
+      ];
+
+      for (const relation of relations) {
+        if (didDoc[relation] && didDoc[relation].length > 0) {
+          document[relation] = didDoc[relation].map((item) => item.uri);
+        }
+      }
+
+      if (didDoc.service) {
+        document.service = didDoc.service;
+      }
+
       return document;
     } catch (error) {
       console.error(`\n❌ Query DID ${identifier} failed:`, error.message);
       throw error;
     }
   }
-
-  parseAttributes(result) {
-    const attributes = {};
-    const kvAttributes = result.kvAttributes.map((attr) => {
-      return {
-        name: attr.name,
-        value: ethers.toUtf8String(attr.value),
-      };
-    });
-    
-    for (const attr of kvAttributes) {
-      attributes[attr.name] = attr.value;
-    }
-    const arrayAttributes = result.arrayAttributes.map((attr) => {
-      return {
-        name: attr.name,
-        values: attr.attributeValues.map((item) => {
-          return {
-            value: ethers.toUtf8String(item.value),
-            revoked: item.revoked,
-          };
-        }),
-      };
-    });
-
-    for (const attr of arrayAttributes) {
-      attributes[attr.name] = [];
-      for (const item of attr.values) {
-        attributes[attr.name].push(JSON.parse(item.value));
-      }
-    }
-    return attributes;
-  }
 }
 
 const ResolverInstance = new Resolver(
-  config.get('RPC_URL'),
-  config.get('CONTRACT_ADDRESS'),
-  require('../abi/DIDRegistry.json')
+  config.get('GRAPH_URL'),
+  config.get('GRAPH_ACCESS_TOKEN')
 );
 
 module.exports = ResolverInstance;
