@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {DIDRegistry} from "../src/DIDRegistry.sol";
+import {DeploymentLib} from "./DeploymentLib.sol";
 
 contract DIDRegistryScript is Script {
     DIDRegistry public registry;
@@ -18,17 +19,16 @@ contract DIDRegistryScript is Script {
 
         registry = new DIDRegistry();
         bytes memory initData = abi.encodeWithSelector(DIDRegistry.initialize.selector, ownerAddress);
-        ERC1967Proxy proxy1967 = new ERC1967Proxy(address(registry), initData);
-        proxy = proxy1967;
+        proxy = new ERC1967Proxy(address(registry), initData);
 
         vm.stopBroadcast();
 
-        string memory root = vm.projectRoot();
-        string memory deployPath = string.concat(root, "/script/deploymentRegistry.json");
-        if (vm.exists(deployPath)) {
-            vm.removeFile(deployPath);
-        }
-        vm.writeFile(deployPath, vm.serializeAddress("", "registry", address(registry)));
-        vm.writeFile(deployPath, vm.serializeAddress("", "proxy", address(proxy)));
+        console.log("DIDRegistry impl: ", address(registry));
+        console.log("DIDRegistry proxy:", address(proxy));
+
+        DeploymentLib.Deployment memory d = DeploymentLib.load();
+        d.registryImpl = address(registry);
+        d.registryProxy = address(proxy);
+        DeploymentLib.save(d);
     }
 }

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import {Script} from "forge-std/Script.sol";
+import {Script, console} from "forge-std/Script.sol";
 import {DIDRegistrar} from "../src/DIDRegistrar.sol";
+import {DeploymentLib} from "./DeploymentLib.sol";
 
 contract DIDRegistrarScript is Script {
     DIDRegistrar public registrar;
@@ -10,22 +11,19 @@ contract DIDRegistrarScript is Script {
     function setUp() public {}
 
     function run() public {
-        string memory root = vm.projectRoot();
-        string memory deployRegistryPath = string.concat(root, "/script/deploymentRegistry.json");
-        string memory json = vm.readFile(deployRegistryPath);
-        address proxy = vm.parseJsonAddress(json, "$.proxy");
+        DeploymentLib.Deployment memory d = DeploymentLib.load();
+        require(d.registryProxy != address(0), "registryProxy missing in deployment.json");
 
         uint256 deployer = vm.envUint("DEPLOYER_PRIVATE_KEY");
         vm.startBroadcast(deployer);
 
-        registrar = new DIDRegistrar(proxy);
+        registrar = new DIDRegistrar(d.registryProxy);
 
         vm.stopBroadcast();
 
-        string memory deployRegistrarPath = string.concat(root, "/script/deploymentRegistrar.json");
-        if (vm.exists(deployRegistrarPath)) {
-            vm.removeFile(deployRegistrarPath);
-        }
-        vm.writeFile(deployRegistrarPath, vm.serializeAddress("", "registrar", address(registrar)));
+        console.log("DIDRegistrar:", address(registrar));
+
+        d.registrar = address(registrar);
+        DeploymentLib.save(d);
     }
 }
