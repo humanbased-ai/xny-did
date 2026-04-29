@@ -15,7 +15,7 @@ with abi_path.open("r", encoding="utf-8") as file:
     abi = json.load(file)
 
 # Read contract address
-deployment_path = current_dir / "deploymentRegistrar.json"
+deployment_path = current_dir / "deployment.json"
 with deployment_path.open("r", encoding="utf-8") as file:
     contract_address = json.load(file)["registrar"]
 
@@ -96,9 +96,9 @@ def get_event(event_name, receipt):
         abi = json.load(file)
 
     # Read contract address
-    deployment_path = current_dir / "deploymentRegistry.json"
+    deployment_path = current_dir / "deployment.json"
     with deployment_path.open("r", encoding="utf-8") as file:
-        contract_address = json.load(file)["proxy"]
+        contract_address = json.load(file)["registryProxy"]
 
     # connect to the blockchain network
     web3 = Web3(Web3.HTTPProvider(rpc_url))
