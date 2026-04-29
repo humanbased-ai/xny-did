@@ -16,3 +16,13 @@ script/.env
 did
 
 broadcast/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+
+# OMC runtime
+.omc/
