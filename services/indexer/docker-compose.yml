@@ -19,7 +19,11 @@ services:
       postgres_pass: let-me-in
       postgres_db: graph-node
       ipfs: "ipfs:5001"
-      ethereum: "mainnet:http://host.docker.internal:8545"
+      # Network label must match subgraph.yaml `network:` (currently base-sepolia).
+      # BASE_SEPOLIA_RPC must point to an archive node — historical replay from
+      # startBlock 34957425 will not work against a pruned/public RPC.
+      # Usage: BASE_SEPOLIA_RPC=https://... docker compose up
+      ethereum: "base-sepolia:${BASE_SEPOLIA_RPC}"
       GRAPH_LOG: info
   ipfs:
     image: ipfs/kubo:v0.17.0
