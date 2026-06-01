@@ -1,6 +1,22 @@
 const ethers = require('ethers');
 const config = require('config');
 
+// did:codatta:<uuid> — the uuid is a uint128 rendered as 8-4-4-4-12 hex.
+// It is NOT a strict v4 UUID (the on-chain uint128 carries no version/variant bits),
+// so we validate the layout only, not the v4 semantic nibbles.
+const DID_CODATTA_RE =
+  /^did:codatta:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Carries the HTTP status + DID Resolution error code so the controller can map it.
+class ResolveError extends Error {
+  constructor(message, status, code) {
+    super(message);
+    this.name = 'ResolveError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 class Resolver {
   /**
    * Constructor
@@ -18,6 +34,13 @@ class Resolver {
    * @returns {Promise<object>} - The resolved DID Document object
    */
   async resolve(identifier) {
+    if (!DID_CODATTA_RE.test(identifier)) {
+      throw new ResolveError(
+        `Invalid did:codatta identifier: ${identifier}`,
+        400,
+        'invalidDid'
+      );
+    }
     try {
       const query = `query($didId: ID!) { diddocument(id: $didId) { id owner controllers: controller verificationMethod { id method { id type value } } alsoKnownAs authentication { id uri } assertionMethod { id uri } keyAgreement { id uri } capabilityInvocation { id uri } capabilityDelegation { id uri } service { id type serviceEndpoint } } }`;
 
@@ -34,12 +57,20 @@ class Resolver {
       const result = response.bodyJson;
 
       if (result.errors) {
-        throw new Error(result.errors.map((e) => e.message).join(', '));
+        throw new ResolveError(
+          result.errors.map((e) => e.message).join(', '),
+          500,
+          'internalError'
+        );
       }
 
       const didDoc = result.data.diddocument;
       if (!didDoc) {
-        throw new Error(`DID Document not found for identifier: ${identifier}`);
+        throw new ResolveError(
+          `DID Document not found for identifier: ${identifier}`,
+          404,
+          'notFound'
+        );
       }
 
       const document = {
@@ -93,7 +124,11 @@ class Resolver {
       return document;
     } catch (error) {
       console.error(`\n❌ Query DID ${identifier} failed:`, error.message);
-      throw error;
+      if (error instanceof ResolveError) {
+        throw error;
+      }
+      // Network / GraphQL transport failures map to internalError (500).
+      throw new ResolveError(error.message, 500, 'internalError');
     }
   }
 }
@@ -104,3 +139,5 @@ const ResolverInstance = new Resolver(
 );
 
 module.exports = ResolverInstance;
+module.exports.Resolver = Resolver;
+module.exports.ResolveError = ResolveError;
