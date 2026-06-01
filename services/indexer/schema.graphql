@@ -1,0 +1,94 @@
+type SingleMethod @entity(immutable: true) {
+  id: ID!
+  controller: String!
+  type: String!
+  value: Bytes!
+  parentId: ID!
+  parentType: String!
+}
+
+type VerificationMethod @entity(immutable: true) {
+  id: ID!
+  method: SingleMethod!
+  didDoc: DIDDocument!
+}
+
+interface BaseAuthEntity {
+  id: ID!
+  uri: String
+  method: SingleMethod
+  didDoc: DIDDocument!
+}
+
+type Authentication implements BaseAuthEntity @entity(immutable: true) {
+  id: ID!
+  uri: String
+  method: SingleMethod
+  didDoc: DIDDocument!
+}
+
+type AssertionMethod implements BaseAuthEntity @entity(immutable: true) {
+  id: ID!
+  uri: String
+  method: SingleMethod
+  didDoc: DIDDocument!
+}
+
+type KeyAgreement implements BaseAuthEntity @entity(immutable: true) {
+  id: ID!
+  uri: String
+  method: SingleMethod
+  didDoc: DIDDocument!
+}
+
+type CapabilityInvocation implements BaseAuthEntity @entity(immutable: true) {
+  id: ID!
+  uri: String
+  method: SingleMethod
+  didDoc: DIDDocument!
+}
+
+type CapabilityDelegation implements BaseAuthEntity @entity(immutable: true) {
+  id: ID!
+  uri: String
+  method: SingleMethod
+  didDoc: DIDDocument!
+}
+
+type Service @entity(immutable: true) {
+  id: ID!
+  type: String!
+  serviceEndpoint: Bytes!
+  didDoc: DIDDocument!
+}
+
+type DIDDocument @entity(immutable: true) {
+  id: ID!
+  owner: Bytes!
+  controller: [String!]!
+  verificationMethod: [VerificationMethod!]! @derivedFrom(field: "didDoc")
+  authentication: [Authentication!] @derivedFrom(field: "didDoc")
+  assertionMethod: [AssertionMethod!] @derivedFrom(field: "didDoc")
+  keyAgreement: [KeyAgreement!] @derivedFrom(field: "didDoc")
+  capabilityInvocation: [CapabilityInvocation!] @derivedFrom(field: "didDoc")
+  capabilityDelegation: [CapabilityDelegation!] @derivedFrom(field: "didDoc")
+  service: [Service!] @derivedFrom(field: "didDoc")
+  alsoKnownAs: [String!]
+  context: [String!]
+}
+
+type Initialized @entity(immutable: true) {
+  id: Bytes!
+  version: BigInt! # uint64
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}
+
+type Upgraded @entity(immutable: true) {
+  id: Bytes!
+  implementation: Bytes! # address
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: Bytes!
+}

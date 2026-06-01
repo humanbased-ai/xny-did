@@ -1,0 +1,8 @@
+{
+  "mainnet": {
+    "DIDRegistry": {
+      "address": "0x3DB4e80aE23AF99BA2a92Aa54E204c03766ce562",
+      "startBlock": 37759471
+    }
+  }
+}
