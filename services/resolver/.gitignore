@@ -1,0 +1,12 @@
+node_modules/
+bower_components/
+dist/
+output/
+.project
+/.settings/
+*.lock
+*.log
+/.idea/
+*.iml
+config/default.json
+package-lock.json
