@@ -2,6 +2,10 @@
 
 var utils = require('../utils/writer.js');
 
+// Universal Resolver driver mode:
+//   success -> bare W3C DID Document (the Universal Resolver layer wraps it into a
+//              full DID Resolution Result)
+//   error   -> DID Resolution Result carrying didResolutionMetadata.error
 module.exports.resolve = function resolve(req, res) {
   const identifier = req.params['identifier'];
   global.Resolver.resolve(identifier)
@@ -19,6 +23,7 @@ module.exports.resolve = function resolve(req, res) {
         },
         didDocumentMetadata: {},
       };
-      utils.writeJson(res, body, status);
+      // Error body is a Resolution Result / plain error, not a DID Document.
+      utils.writeJson(res, body, status, 'application/json');
     });
 };

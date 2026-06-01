@@ -1,5 +1,11 @@
 'use strict';
 
+// resolver.js builds a config-backed singleton at module load (config.get throws if
+// GRAPH_URL / GRAPH_ACCESS_TOKEN are unset). Provide dummies before requiring it so the
+// suite is self-contained on a clean checkout; tests use their own mock-server instances.
+process.env.GRAPH_URL = process.env.GRAPH_URL || 'http://unused.local';
+process.env.GRAPH_ACCESS_TOKEN = process.env.GRAPH_ACCESS_TOKEN || 'test';
+
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
@@ -69,6 +75,13 @@ test('invalid DID layout -> 400 invalidDid (no subgraph call)', async () => {
 test('wrong method -> 400 invalidDid', async () => {
   await assert.rejects(
     () => resolver.resolve('did:example:11111111-1111-1111-1111-111111111111'),
+    (e) => e.status === 400 && e.code === 'invalidDid'
+  );
+});
+
+test('uppercase method name -> 400 invalidDid (DID Core case-sensitivity)', async () => {
+  await assert.rejects(
+    () => resolver.resolve('did:CODATTA:11111111-1111-1111-1111-111111111111'),
     (e) => e.status === 400 && e.code === 'invalidDid'
   );
 });
