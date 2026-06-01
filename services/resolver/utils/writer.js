@@ -7,7 +7,7 @@ exports.respondWithCode = function (code, payload) {
   return new ResponsePayload(code, payload);
 };
 
-var writeJson = (exports.writeJson = function (response, arg1, arg2) {
+var writeJson = (exports.writeJson = function (response, arg1, arg2, contentType) {
   var code;
   var payload;
 
@@ -41,6 +41,9 @@ var writeJson = (exports.writeJson = function (response, arg1, arg2) {
   if (typeof payload === 'object') {
     payload = JSON.stringify(payload, null, 2);
   }
-  response.writeHead(code, { 'Content-Type': 'application/json' });
+  // W3C DID Resolution HTTPS binding: default to the DID Document JSON-LD media type.
+  response.writeHead(code, {
+    'Content-Type': contentType || 'application/did+ld+json',
+  });
   response.end(payload);
 });

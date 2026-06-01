@@ -6,11 +6,10 @@ This is Codatta DID resolver, which compatible with [Universal Resolver](https:/
 
 *   [Decentralized Identifiers](https://w3c.github.io/did-core/)
 *   [Decentralized Identifiers (DIDs) v1.0](https://w3c.github.io/did-core/)
-*   [API Documentation](./docs/openapi.md)
 
 ## Example DIDs
 
-The identifier for a `did:codatta` DID must be a valid UUID.
+The identifier for a `did:codatta` DID must be a UUID-formatted identifier (a `uint128` rendered as 8-4-4-4-12 hex; the `did:codatta:` prefix is case-sensitive).
 
 ```
 did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71
