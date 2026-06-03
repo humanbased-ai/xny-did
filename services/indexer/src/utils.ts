@@ -36,7 +36,7 @@ export function uint128ToUUID(value: BigInt): string {
 }
 
 export function uint128ToDID(value: BigInt): string {
-  return 'did:codatta:' + uint128ToUUID(value);
+  return 'did:xny:' + uint128ToUUID(value);
 }
 
 export function isValidDID(did: string): boolean {

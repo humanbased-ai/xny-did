@@ -1,6 +1,6 @@
-# Coddata DID
+# Xny DID
 
-This repository provides the Solidity-based EVM implementation of the did:codatta method.
+This repository provides the Solidity-based EVM implementation of the did:xny method.
 It defines the smart contracts responsible for creating DIDs and recording DID Documents in a decentralized manner.
 
 ## Features

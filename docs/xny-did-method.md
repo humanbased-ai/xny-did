@@ -1,15 +1,15 @@
-# Codatta DID Method Specification
+# Xny DID Method Specification
 
-**DID Method Name:** `codatta`
+**DID Method Name:** `xny`
 
 ## Abstract
 
-`did:codatta` is a Decentralized Identifier (DID) method designed for Web3
+`did:xny` is a Decentralized Identifier (DID) method designed for Web3
 applications. It aims to provide a unified, verifiable, and controllable digital
 identity for users, data assets, and smart contracts.
 
 Unlike DID methods that derive the method-specific identifier from an on-chain
-address, `did:codatta` derives it from a random value. This keeps the identifier
+address, `did:xny` derives it from a random value. This keeps the identifier
 chain-independent and makes the method straightforward to deploy across multiple
 chains. Document updates are authorized through `controller` entries, and the
 DID's own identifier always retains the highest authority over its document,
@@ -32,22 +32,22 @@ This specification is intended to conform to
 
 > **Note.** This document describes the method as actually deployed (registry
 > contracts, indexer, and resolver) and is the authoritative specification for
-> `did:codatta`. Where it narrows or differs from W3C DID Core, the differences
+> `did:xny`. Where it narrows or differs from W3C DID Core, the differences
 > are listed under [Deviations from DID Core](#deviations-from-did-core).
 
 ## DID Method Name
 
-The method name that identifies this DID method is `codatta`.
+The method name that identifies this DID method is `xny`.
 
-A DID using this method **MUST** begin with the prefix `did:codatta`. Per DID
+A DID using this method **MUST** begin with the prefix `did:xny`. Per DID
 Core, this prefix is lowercase.
 
 ## Identifier Syntax
 
-A `did:codatta` identifier has the form:
+A `did:xny` identifier has the form:
 
 ```
-did:codatta:<method-specific-id>
+did:xny:<method-specific-id>
 ```
 
 The `<method-specific-id>` is the UUID-formatted rendering of a 128-bit unsigned
@@ -55,7 +55,7 @@ integer (`uint128`): five groups of hexadecimal digits separated by hyphens in
 the `8-4-4-4-12` layout.
 
 ```abnf
-codatta-did        = "did:codatta:" method-specific-id
+xny-did        = "did:xny:" method-specific-id
 method-specific-id = 8hex-digit "-" 4hex-digit "-" 4hex-digit "-" 4hex-digit "-" 12hex-digit
 hex-digit          = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
                            / "a" / "b" / "c" / "d" / "e" / "f"
@@ -64,10 +64,10 @@ hex-digit          = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
 Example:
 
 ```
-did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71
+did:xny:95228308-9d75-4dd8-8958-2713b92d3d71
 ```
 
-The `did:codatta:` prefix is matched case-sensitively. The hexadecimal section
+The `did:xny:` prefix is matched case-sensitively. The hexadecimal section
 accepts both upper- and lower-case digits. The reference generator produces a
 strict UUIDv4 (it sets the version and variant bits), but because the underlying
 value is an arbitrary `uint128`, resolvers validate the UUID *layout* only and do
@@ -94,7 +94,7 @@ when resolving.
 
 ## DID Document
 
-A `did:codatta` DID Document is a JSON object. The following properties are
+A `did:xny` DID Document is a JSON object. The following properties are
 defined.
 
 ### Required Properties
@@ -125,7 +125,7 @@ arrays of references to `verificationMethod` entries (verification method `id`
 strings); this method does not embed inline verification methods in a
 relationship.
 
-> **Method-specific extension properties.** `owner` is a `did:codatta`
+> **Method-specific extension properties.** `owner` is a `did:xny`
 > extension property, not a property defined by W3C DID Core. Likewise, the
 > custom `verificationMethod.type` values defined in
 > [Verification Methods](#verification-methods) (`EmailChallenge`, `GoogleAuth`,
@@ -146,26 +146,26 @@ salted hashes).
 ```json
 {
   "@context": ["https://www.w3.org/ns/did/v1"],
-  "id": "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71",
+  "id": "did:xny:95228308-9d75-4dd8-8958-2713b92d3d71",
   "owner": "0x1234567890abcdef1234567890abcdef12345678",
-  "controller": ["did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71"],
+  "controller": ["did:xny:95228308-9d75-4dd8-8958-2713b92d3d71"],
   "verificationMethod": [
     {
-      "id": "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71#key-1",
+      "id": "did:xny:95228308-9d75-4dd8-8958-2713b92d3d71#key-1",
       "type": "EthereumAddress",
-      "controller": "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71",
+      "controller": "did:xny:95228308-9d75-4dd8-8958-2713b92d3d71",
       "ethereumAddress": "0x1234567890abcdef1234567890abcdef12345678"
     }
   ],
   "authentication": [
-    "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71#key-1"
+    "did:xny:95228308-9d75-4dd8-8958-2713b92d3d71#key-1"
   ],
   "assertionMethod": [
-    "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71#key-1"
+    "did:xny:95228308-9d75-4dd8-8958-2713b92d3d71#key-1"
   ],
   "service": [
     {
-      "id": "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71#profile",
+      "id": "did:xny:95228308-9d75-4dd8-8958-2713b92d3d71#profile",
       "type": "LinkedDomains",
       "serviceEndpoint": "https://example.com/"
     }
@@ -194,7 +194,7 @@ as follows:
 
 ## Verification Methods
 
-In addition to standard verification method types, `did:codatta` defines the
+In addition to standard verification method types, `did:xny` defines the
 following method-specific types. For each type it is **RECOMMENDED** to obscure
 the identifying value with a salted hash (`hash + salt`) to avoid leaking private
 information.
@@ -215,9 +215,9 @@ a verification code).
 
 ```json
 {
-  "id": "did:codatta:<id>#key-1",
+  "id": "did:xny:<id>#key-1",
   "type": "EmailChallenge",
-  "controller": "did:codatta:<id>",
+  "controller": "did:xny:<id>",
   "emailAddress": "name@email.com"
 }
 ```
@@ -228,9 +228,9 @@ It is **RECOMMENDED** to store `emailAddress` as a salted hash.
 
 ```json
 {
-  "id": "did:codatta:<id>#key-1",
+  "id": "did:xny:<id>#key-1",
   "type": "GoogleAuth",
-  "controller": "did:codatta:<id>",
+  "controller": "did:xny:<id>",
   "googleOpenID": "1234"
 }
 ```
@@ -243,9 +243,9 @@ Compatible with existing Ethereum wallet login.
 
 ```json
 {
-  "id": "did:codatta:<id>#key-1",
+  "id": "did:xny:<id>#key-1",
   "type": "EthereumAddress",
-  "controller": "did:codatta:<id>",
+  "controller": "did:xny:<id>",
   "ethereumAddress": "0x1234567890abcdef1234567890abcdef12345678"
 }
 ```
@@ -258,9 +258,9 @@ Compatible with existing TON wallet login.
 
 ```json
 {
-  "id": "did:codatta:<id>#key-1",
+  "id": "did:xny:<id>#key-1",
   "type": "TonAddress",
-  "controller": "did:codatta:<id>",
+  "controller": "did:xny:<id>",
   "tonAddress": "EQABIjRWeJq83vASNFZ4mrze8BI0VniavN7wEjRWeJq83iSU"
 }
 ```
@@ -301,7 +301,7 @@ cost.
 
 ### Read (Resolve)
 
-- **Input:** a `did:codatta` DID.
+- **Input:** a `did:xny` DID.
 - **Processing:** the resolver validates the identifier syntax, looks up the
   current registry state for that DID, and assembles a W3C DID Document. The
   on-chain registry additionally exposes the document for direct, highest-trust
@@ -353,14 +353,14 @@ identifier).
 ### Deactivate
 
 Deactivation is **not currently supported**. The on-chain DID registry exposes no
-deactivation operation, so a `did:codatta` DID cannot presently be marked
+deactivation operation, so a `did:xny` DID cannot presently be marked
 inactive. Owner-initiated deactivation is anticipated as future work; this
 specification will define its inputs, authorization, and processing once the
 mechanism is implemented.
 
 ## Storage Model
 
-`did:codatta` does not restrict where the DID Document is stored, but a combined
+`did:xny` does not restrict where the DID Document is stored, but a combined
 on-chain and off-chain storage model is **RECOMMENDED**.
 
 ### On-Chain Storage

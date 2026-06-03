@@ -20,10 +20,10 @@ const controllers = require('../controllers/Default');
 const RESOLUTION_PROFILE =
   'application/ld+json;profile="https://w3id.org/did-resolution"';
 
-// Valid-layout did:codatta identifiers used to steer the mock subgraph.
-const FOUND = 'did:codatta:11111111-1111-1111-1111-111111111111';
-const NOT_FOUND = 'did:codatta:22222222-2222-2222-2222-222222222222';
-const GRAPH_ERROR = 'did:codatta:33333333-3333-3333-3333-333333333333';
+// Valid-layout did:xny identifiers used to steer the mock subgraph.
+const FOUND = 'did:xny:11111111-1111-1111-1111-111111111111';
+const NOT_FOUND = 'did:xny:22222222-2222-2222-2222-222222222222';
+const GRAPH_ERROR = 'did:xny:33333333-3333-3333-3333-333333333333';
 
 let server;
 let resolver;
@@ -76,7 +76,7 @@ after(() => server.close());
 
 test('invalid DID layout -> 400 invalidDid (no subgraph call)', async () => {
   await assert.rejects(
-    () => resolver.resolve('did:codatta:not-a-uuid'),
+    () => resolver.resolve('did:xny:not-a-uuid'),
     (e) => e.status === 400 && e.code === 'invalidDid'
   );
 });
@@ -90,7 +90,7 @@ test('wrong method -> 400 invalidDid', async () => {
 
 test('uppercase method name -> 400 invalidDid (DID Core case-sensitivity)', async () => {
   await assert.rejects(
-    () => resolver.resolve('did:CODATTA:11111111-1111-1111-1111-111111111111'),
+    () => resolver.resolve('did:XNY:11111111-1111-1111-1111-111111111111'),
     (e) => e.status === 400 && e.code === 'invalidDid'
   );
 });
