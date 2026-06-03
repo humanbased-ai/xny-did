@@ -31,10 +31,9 @@ This specification is intended to conform to
 [Decentralized Identifiers (DIDs) v1.0](https://www.w3.org/TR/did-core/).
 
 > **Note.** This document describes the method as actually deployed (registry
-> contracts, indexer, and resolver). Where it differs from the earlier Chinese
-> draft archived under `docs/zh/` — notably deactivation (not implemented),
-> update semantics (per-item add/revoke), and the owner/controller authority
-> model — this specification is authoritative.
+> contracts, indexer, and resolver) and is the authoritative specification for
+> `did:codatta`. Where it narrows or differs from W3C DID Core, the differences
+> are listed under [Deviations from DID Core](#deviations-from-did-core).
 
 ## DID Method Name
 
@@ -73,10 +72,14 @@ accepts both upper- and lower-case digits. The reference generator produces a
 strict UUIDv4 (it sets the version and variant bits), but because the underlying
 value is an arbitrary `uint128`, resolvers validate the UUID *layout* only and do
 not require the version/variant nibbles of a strict UUIDv4; any value conforming
-to the layout is accepted. To avoid two distinct string forms for the same DID,
-resolvers **MUST** emit the identifier in canonical lowercase
-([RFC 4122](https://www.rfc-editor.org/rfc/rfc4122) §3); the reference resolver
-does so.
+to the layout is accepted. The hex section denotes a `uint128` and is therefore
+case-insensitive: two identifiers differing only in the case of the hex section
+denote the **same** DID. The canonical form is lowercase
+([RFC 4122](https://www.rfc-editor.org/rfc/rfc4122) §3): resolvers **MUST** emit
+the identifier in lowercase, and clients and resolvers **SHOULD** normalize the
+hex section to lowercase before comparison or lookup. The reference resolver
+emits lowercase; clients should not assume an upper-case identifier resolves
+unless it has been normalized.
 
 ## Method-Specific Identifier
 
@@ -102,7 +105,7 @@ defined.
 | `id`                 | The DID identifier string.                                                                            |
 | `owner`              | Wallet address — for example, an Ethereum address if deployed on Base Chain.                          |
 | `controller`         | **MUST** contain at least the DID's own identifier. An array.                                          |
-| `verificationMethod` | **MUST** contain at least one verification method that is verifiable on the deployment chain. An array.|
+| `verificationMethod` | The DID's verification methods (on-chain or off-chain types — see [Verification Methods](#verification-methods)). An array; **SHOULD** include at least one method usable to authenticate the subject. |
 
 ### Optional Properties
 
@@ -135,6 +138,11 @@ relationship.
 
 ### Example
 
+The example below is illustrative; it embeds a plaintext address for clarity.
+Production deployments should follow the
+[Privacy Considerations](#privacy-considerations) (store identifying values as
+salted hashes).
+
 ```json
 {
   "@context": ["https://www.w3.org/ns/did/v1"],
@@ -148,9 +156,41 @@ relationship.
       "controller": "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71",
       "ethereumAddress": "0x1234567890abcdef1234567890abcdef12345678"
     }
+  ],
+  "authentication": [
+    "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71#key-1"
+  ],
+  "assertionMethod": [
+    "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71#key-1"
+  ],
+  "service": [
+    {
+      "id": "did:codatta:95228308-9d75-4dd8-8958-2713b92d3d71#profile",
+      "type": "LinkedDomains",
+      "serviceEndpoint": "https://example.com/"
+    }
   ]
 }
 ```
+
+Note that `authentication` and `assertionMethod` contain *references* to the
+`verificationMethod` entry (its `id`), not inline method objects.
+
+## Deviations from DID Core
+
+This method intentionally narrows or extends [W3C DID Core](https://www.w3.org/TR/did-core/)
+as follows:
+
+- `controller` is always an array (DID Core also permits a single string).
+- `owner` is a method-specific extension property; it is not defined by DID Core.
+- Verification relationships (`authentication`, `assertionMethod`,
+  `keyAgreement`, `capabilityInvocation`, `capabilityDelegation`) contain only
+  references to `verificationMethod` entries; inline verification methods are not
+  used (DID Core permits inline definitions).
+- The custom `verificationMethod.type` values defined in
+  [Verification Methods](#verification-methods) are method-specific and require a
+  method-specific `@context` to be valid JSON-LD.
+- Deactivation is not currently supported (see [Deactivate](#deactivate)).
 
 ## Verification Methods
 
@@ -158,6 +198,15 @@ In addition to standard verification method types, `did:codatta` defines the
 following method-specific types. For each type it is **RECOMMENDED** to obscure
 the identifying value with a salted hash (`hash + salt`) to avoid leaking private
 information.
+
+The salted hash protects against correlation by parties that only *read* the
+published document — it does not hide the value from a party that already knows
+it. In a challenge/login flow the relying party learns the cleartext value
+out-of-band (the user presents the email, signs with the wallet, etc.) and
+verifies it against the stored hash. Use a hashed value only where the verifier
+obtains the cleartext through the flow; if a verification method must be usable
+by a party that only reads the document and has no out-of-band value, the hash
+is not sufficient and the cleartext (or a different method) is required.
 
 ### EmailChallenge
 
