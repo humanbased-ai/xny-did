@@ -30,6 +30,12 @@ document are to be interpreted as described in
 This specification is intended to conform to
 [Decentralized Identifiers (DIDs) v1.0](https://www.w3.org/TR/did-core/).
 
+> **Note.** This document describes the method as actually deployed (registry
+> contracts, indexer, and resolver). Where it differs from the earlier Chinese
+> draft archived under `docs/zh/` — notably deactivation (not implemented),
+> update semantics (per-item add/revoke), and the owner/controller authority
+> model — this specification is authoritative.
+
 ## DID Method Name
 
 The method name that identifies this DID method is `codatta`.
@@ -51,8 +57,8 @@ the `8-4-4-4-12` layout.
 
 ```abnf
 codatta-did        = "did:codatta:" method-specific-id
-method-specific-id = 8HEXDIG "-" 4HEXDIG "-" 4HEXDIG "-" 4HEXDIG "-" 12HEXDIG
-HEXDIG             = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
+method-specific-id = 8hex-digit "-" 4hex-digit "-" 4hex-digit "-" 4hex-digit "-" 12hex-digit
+hex-digit          = DIGIT / "A" / "B" / "C" / "D" / "E" / "F"
                            / "a" / "b" / "c" / "d" / "e" / "f"
 ```
 
@@ -66,8 +72,11 @@ The `did:codatta:` prefix is matched case-sensitively. The hexadecimal section
 accepts both upper- and lower-case digits. The reference generator produces a
 strict UUIDv4 (it sets the version and variant bits), but because the underlying
 value is an arbitrary `uint128`, resolvers validate the UUID *layout* only and do
-not require the version/variant nibbles of a strict UUIDv4 — any value conforming
-to the layout is accepted.
+not require the version/variant nibbles of a strict UUIDv4; any value conforming
+to the layout is accepted. To avoid two distinct string forms for the same DID,
+resolvers **MUST** emit the identifier in canonical lowercase
+([RFC 4122](https://www.rfc-editor.org/rfc/rfc4122) §3); the reference resolver
+does so.
 
 ## Method-Specific Identifier
 
@@ -99,7 +108,7 @@ defined.
 
 | Property                | Description                                                                                              |
 | ----------------------- | -------------------------------------------------------------------------------------------------------- |
-| `alsoKnownAs`           | Aliases. An array.                                                                                        |
+| `alsoKnownAs`           | Aliases for the DID subject, expressed as an array of URIs (per DID Core).                                |
 | `authentication`        | References to `verificationMethod` entries used for authentication (an array of verification method `id` strings). |
 | `assertionMethod`       | Verification methods used for signing assertions. An array.                                              |
 | `keyAgreement`          | Verification methods used for encrypted communication. An array.                                         |
@@ -248,8 +257,18 @@ cost.
   current registry state for that DID, and assembles a W3C DID Document. The
   on-chain registry additionally exposes the document for direct, highest-trust
   reads.
-- **Output:** a DID Document (returned in JSON by the off-chain resolver), or a
-  resolution error (for example, *not found* for an unregistered DID).
+- **Output:** a [DID Resolution Result](https://w3c.github.io/did-resolution/) —
+  `didDocument`, `didResolutionMetadata`, and `didDocumentMetadata` — or, when the
+  client requests a bare document representation, the DID Document itself.
+
+The off-chain resolver implements the
+[W3C DID Resolution](https://w3c.github.io/did-resolution/) HTTP(S) binding:
+`GET /1.0/identifiers/{did}`, with `Accept`-based content negotiation between the
+bare DID Document (`application/did+ld+json` / `application/did+json`) and the
+full DID Resolution Result (`application/ld+json;profile="https://w3id.org/did-resolution"`).
+Resolution errors are reported via HTTP status and `didResolutionMetadata.error`
+(for example, *notFound* for an unregistered DID, *invalidDid* for a malformed
+identifier).
 
 ### Update
 
@@ -306,7 +325,10 @@ described in [Off-Chain Storage](#off-chain-storage) and [Resolve](#read-resolve
 ### Off-Chain Storage
 
 To provide a complete query service and a better user experience, the off-chain
-layer stores the full history of DID operations along with the latest state.
+layer stores the full history of DID operations along with the latest state. The
+on-chain state is authoritative: the off-chain layer is an index of on-chain
+events and **MUST NOT** diverge from on-chain truth. On any discrepancy, the
+on-chain registry prevails.
 
 ## Security Considerations
 
