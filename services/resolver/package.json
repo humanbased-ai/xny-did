@@ -1,7 +1,7 @@
 {
-  "name": "codatta-did-resolver",
+  "name": "xny-did-resolver",
   "version": "1.0.0",
-  "description": "The Codatta DID Resolver Driver",
+  "description": "The Xny DID Resolver Driver",
   "main": "index.js",
   "scripts": {
     "prestart": "npm install",

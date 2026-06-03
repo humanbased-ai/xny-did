@@ -1,13 +1,13 @@
 const ethers = require('ethers');
 const config = require('config');
 
-// did:codatta:<uuid> — the uuid is a uint128 rendered as 8-4-4-4-12 hex.
+// did:xny:<uuid> — the uuid is a uint128 rendered as 8-4-4-4-12 hex.
 // It is NOT a strict v4 UUID (the on-chain uint128 carries no version/variant bits),
 // so we validate the layout only, not the v4 semantic nibbles.
-// The "did:codatta:" prefix is matched case-sensitively (per DID Core the scheme and
+// The "did:xny:" prefix is matched case-sensitively (per DID Core the scheme and
 // method name are lowercase); only the hex section accepts upper/lower case.
-const DID_CODATTA_RE =
-  /^did:codatta:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+const DID_XNY_RE =
+  /^did:xny:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
 
 // Carries the HTTP status + DID Resolution error code so the controller can map it.
 class ResolveError extends Error {
@@ -36,9 +36,9 @@ class Resolver {
    * @returns {Promise<object>} - The resolved DID Document object
    */
   async resolve(identifier) {
-    if (!DID_CODATTA_RE.test(identifier)) {
+    if (!DID_XNY_RE.test(identifier)) {
       throw new ResolveError(
-        `Invalid did:codatta identifier: ${identifier}`,
+        `Invalid did:xny identifier: ${identifier}`,
         400,
         'invalidDid'
       );

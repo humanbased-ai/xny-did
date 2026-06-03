@@ -1,8 +1,8 @@
-# Dockerfile for codatta/did-resolver
+# Dockerfile for xny/did-resolver
 
 FROM node:20
 
-# build codatta did resolver driver
+# build xny did resolver driver
 
 WORKDIR /usr/src/app
 COPY package.json ./
