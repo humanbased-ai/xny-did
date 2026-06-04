@@ -1,4 +1,4 @@
-type SingleMethod @entity(immutable: true) {
+type SingleMethod @entity(immutable: false) {
   id: ID!
   controller: String!
   type: String!
@@ -7,7 +7,7 @@ type SingleMethod @entity(immutable: true) {
   parentType: String!
 }
 
-type VerificationMethod @entity(immutable: true) {
+type VerificationMethod @entity(immutable: false) {
   id: ID!
   method: SingleMethod!
   didDoc: DIDDocument!
@@ -20,49 +20,49 @@ interface BaseAuthEntity {
   didDoc: DIDDocument!
 }
 
-type Authentication implements BaseAuthEntity @entity(immutable: true) {
+type Authentication implements BaseAuthEntity @entity(immutable: false) {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type AssertionMethod implements BaseAuthEntity @entity(immutable: true) {
+type AssertionMethod implements BaseAuthEntity @entity(immutable: false) {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type KeyAgreement implements BaseAuthEntity @entity(immutable: true) {
+type KeyAgreement implements BaseAuthEntity @entity(immutable: false) {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type CapabilityInvocation implements BaseAuthEntity @entity(immutable: true) {
+type CapabilityInvocation implements BaseAuthEntity @entity(immutable: false) {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type CapabilityDelegation implements BaseAuthEntity @entity(immutable: true) {
+type CapabilityDelegation implements BaseAuthEntity @entity(immutable: false) {
   id: ID!
   uri: String
   method: SingleMethod
   didDoc: DIDDocument!
 }
 
-type Service @entity(immutable: true) {
+type Service @entity(immutable: false) {
   id: ID!
   type: String!
   serviceEndpoint: Bytes!
   didDoc: DIDDocument!
 }
 
-type DIDDocument @entity(immutable: true) {
+type DIDDocument @entity(immutable: false) {
   id: ID!
   owner: Bytes!
   controller: [String!]!

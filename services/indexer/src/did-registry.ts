@@ -256,6 +256,11 @@ export function handleDIDOwnerChanged(event: DIDOwnerChangedEvent): void {
 
 export function handleDIDRegistered(event: DIDRegisteredEvent): void {
   let did = uint128ToDID(event.params.identifier);
+  let existing = DIDDocument.load(did);
+  if (existing != null) {
+    Logger.warn('handleDIDRegistered - did already registered: {}', [did]);
+    return;
+  }
   let entity = new DIDDocument(did);
   entity.controller = [did];
   entity.owner = event.params.owner;
