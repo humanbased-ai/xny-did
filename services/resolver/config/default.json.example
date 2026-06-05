@@ -1,4 +1,4 @@
 {
-  "GRAPH_URL": "https://",
+  "GRAPH_URL": "https://api.studio.thegraph.com/query/1715903/did-base-sepolia/version/v0.0.1",
   "GRAPH_ACCESS_TOKEN": "YOUR_GRAPH_ACCESS_TOKEN"
 }

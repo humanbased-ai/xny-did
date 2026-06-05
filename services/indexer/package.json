@@ -5,10 +5,10 @@
     "codegen": "graph codegen",
     "build": "graph build",
     "format": "prettier --write 'src/**/*.ts' 'tests/**/*.ts'",
-    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ xny-indexer",
-    "create-local": "graph create --node http://localhost:8020/ xny-indexer",
-    "remove-local": "graph remove --node http://localhost:8020/ xny-indexer",
-    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 xny-indexer",
+    "deploy": "graph deploy --node https://api.studio.thegraph.com/deploy/ did-base-sepolia",
+    "create-local": "graph create --node http://localhost:8020/ did-base-sepolia",
+    "remove-local": "graph remove --node http://localhost:8020/ did-base-sepolia",
+    "deploy-local": "graph deploy --node http://localhost:8020/ --ipfs http://localhost:5001 did-base-sepolia",
     "test": "graph test -d"
   },
   "dependencies": {
