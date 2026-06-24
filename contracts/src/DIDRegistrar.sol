@@ -15,7 +15,7 @@ contract DIDRegistrar {
     }
 
     function register() public {
-        uint128 identifier = DIDGenerator.generateUuidv4Uint128();
+        uint128 identifier = DIDGenerator.randomUint128();
         _registry.register(identifier, msg.sender);
     }
 
@@ -26,7 +26,7 @@ contract DIDRegistrar {
      *  and then convert it to bytes.
      */
     function registerWithAuthorization(bytes[] calldata authorizations) public {
-        uint128 identifier = DIDGenerator.generateUuidv4Uint128();
+        uint128 identifier = DIDGenerator.randomUint128();
         _registry.register(identifier, address(this));
 
         for (uint256 i = 0; i < authorizations.length; ++i) {
