@@ -20,7 +20,7 @@ Deactivate
 did:xny支持did所有者注销did
 Method-specific Identifier
 <method-specific-id>采用随机算法进行生成，数据类型为uint128。
-推荐: 可以使用UUID v4，只有122个有效位，但是可以增加可读性，符合UUID规范。在实现存储时，可以使用uint128进行存储，但是did resolver解析出来后转为UUID格式。
+链上以 uint128 存储；DID resolver 解析时按 8-4-4-4-12 UUID-like hex 分组输出（仅为展示约定以提升可读性，不要求是 RFC 4122 UUID，也不约束 version / variant bits）。
 Method-specific DID Document Structure
 Must-haves
 - @context: DID Document上下文，为了兼容w3c did标准的JSON-LD而添加，数组

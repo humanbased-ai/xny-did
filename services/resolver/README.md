@@ -9,7 +9,7 @@ This is Xny DID resolver, which compatible with [Universal Resolver](https://git
 
 ## Example DIDs
 
-The identifier for a `did:xny` DID must be a UUID-formatted identifier (a `uint128` rendered as 8-4-4-4-12 hex; the `did:xny:` prefix is case-sensitive).
+The identifier for a `did:xny` DID is a 128-bit unsigned integer (`uint128`) rendered as `8-4-4-4-12` hex (a display convention, not an RFC 4122 UUID); the `did:xny:` prefix is case-sensitive.
 
 ```
 did:xny:95228308-9d75-4dd8-8958-2713b92d3d71
