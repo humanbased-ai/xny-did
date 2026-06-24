@@ -98,7 +98,7 @@ contract InviteRegistrar is Ownable {
         usedNonces[nonce] = true;
 
         // Register DID with specified owner
-        uint128 identifier = DIDGenerator.generateUuidv4Uint128();
+        uint128 identifier = DIDGenerator.randomUint128();
         registry.register(identifier, owner);
 
         emit InviteRegistered(identifier, owner, inviter, nonce);
