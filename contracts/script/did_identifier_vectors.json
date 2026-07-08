@@ -2,6 +2,7 @@
   "description": "Reference vectors for the deterministic did:xny identifier scheme. identifier = uint128(uint256(keccak256(DOMAIN_SALT ++ utf8(userId)))). Shared source of truth: asserted against by contracts/test/HumanbasedRegistrar.t.sol (on-chain) and contracts/script/did_identifier.py (off-chain).",
   "domainSaltPreimage": "did:xny:identifier:v1",
   "domainSalt": "0xbc878e26ec61bf617e002e90ebdcae39539722731c59b7bb10c543a72a07daf0",
+  "canonicalHappyPathUserId": "user-00000000-0000-0000-0000-000000000001",
   "count": 4,
   "vectors": [
     {
