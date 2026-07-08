@@ -19,6 +19,7 @@ interface IDIDRegistry {
 
     function register(uint128 identifier, address owner) external;
     function transferOwner(uint128 identifier, address to) external;
+    function ownerOf(uint128 identifier) external view returns (address owner);
     function addItemToAttribute(uint128 identifier, uint128 operator, string calldata name, bytes calldata value)
         external;
     function getDidDocument(uint128 identifier)
