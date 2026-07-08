@@ -8,8 +8,6 @@ import {DeploymentLib} from "./DeploymentLib.sol";
 contract DIDRegistrarScript is Script {
     DIDRegistrar public registrar;
 
-    function setUp() public {}
-
     function run() public {
         DeploymentLib.Deployment memory d = DeploymentLib.load();
         require(d.registryProxy != address(0), "registryProxy missing in deployment.json");

@@ -10,8 +10,6 @@ contract DIDRegistryScript is Script {
     DIDRegistry public registry;
     ERC1967Proxy public proxy;
 
-    function setUp() public {}
-
     function run() public {
         uint256 deployer = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address ownerAddress = vm.envAddress("OWNER");
