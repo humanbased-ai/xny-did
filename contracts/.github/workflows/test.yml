@@ -9,6 +9,9 @@ env:
   # Run forge under the `test` profile so E2EPrecomputeTest can vm.ffi-invoke
   # the off-chain Python helper. (See [profile.test] in foundry.toml.)
   FOUNDRY_PROFILE: test
+  # Path to the project-local venv's interpreter. E2EPrecomputeTest reads this
+  # via `vm.envString("PYTHON_BIN")`; defaults to `python3` on PATH if unset.
+  PYTHON_BIN: .venv/bin/python3
 
 jobs:
   check:
@@ -22,11 +25,14 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
-      - name: Install Python dependencies
-        # E2EPrecomputeTest uses vm.ffi to invoke script/did_identifier.py.
-        # `web3` transitively pulls `eth_utils`, which the helper imports.
+      - name: Set up Python venv
+        # Project-local venv (vs `pip install --user`): same flow works on
+        # macOS dev machines with Homebrew Python 3.12+ where PEP 668 blocks
+        # `--user` installs of system packages. The venv lives next to the
+        # contracts dir; the E2E test reads it via PYTHON_BIN.
         run: |
-          python3 -m pip install --user -r script/requirements.txt
+          python3 -m venv .venv
+          .venv/bin/pip install -r script/requirements.txt
 
       - name: Show Forge version
         run: |
