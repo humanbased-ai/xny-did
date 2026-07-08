@@ -6,7 +6,9 @@ on:
   workflow_dispatch:
 
 env:
-  FOUNDRY_PROFILE: ci
+  # Run forge under the `test` profile so E2EPrecomputeTest can vm.ffi-invoke
+  # the off-chain Python helper. (See [profile.test] in foundry.toml.)
+  FOUNDRY_PROFILE: test
 
 jobs:
   check:
