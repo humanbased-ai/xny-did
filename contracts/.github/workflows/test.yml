@@ -20,6 +20,12 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Install Python dependencies
+        # E2EPrecomputeTest uses vm.ffi to invoke script/did_identifier.py.
+        # `web3` transitively pulls `eth_utils`, which the helper imports.
+        run: |
+          python3 -m pip install --user -r script/requirements.txt
+
       - name: Show Forge version
         run: |
           forge --version
