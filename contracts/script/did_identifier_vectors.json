@@ -1,0 +1,28 @@
+{
+  "description": "Reference vectors for the deterministic did:xny identifier scheme. identifier = uint128(uint256(keccak256(DOMAIN_SALT ++ utf8(userId)))). Shared source of truth: asserted against by contracts/test/HumanbasedRegistrar.t.sol (on-chain) and contracts/script/did_identifier.py (off-chain).",
+  "domainSaltPreimage": "did:xny:identifier:v1",
+  "domainSalt": "0xbc878e26ec61bf617e002e90ebdcae39539722731c59b7bb10c543a72a07daf0",
+  "count": 4,
+  "vectors": [
+    {
+      "userId": "user-00000000-0000-0000-0000-000000000001",
+      "identifier": "0x74990544b02966b370fb10884bc0a595",
+      "did": "did:xny:74990544-b029-66b3-70fb-10884bc0a595"
+    },
+    {
+      "userId": "alice@example.com",
+      "identifier": "0x083efedff05dbdf2277239a3a3285ae0",
+      "did": "did:xny:083efedf-f05d-bdf2-2772-39a3a3285ae0"
+    },
+    {
+      "userId": "",
+      "identifier": "0xb3756e811a01b9c896fb71e464a41536",
+      "did": "did:xny:b3756e81-1a01-b9c8-96fb-71e464a41536"
+    },
+    {
+      "userId": "用户-张三",
+      "identifier": "0xcff2703c2f836eef84cce11d35c58a28",
+      "did": "did:xny:cff2703c-2f83-6eef-84cc-e11d35c58a28"
+    }
+  ]
+}
