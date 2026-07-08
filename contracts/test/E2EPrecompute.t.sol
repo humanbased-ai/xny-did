@@ -106,7 +106,11 @@ contract E2EPrecomputeTest is Test {
 
             // 4. Full register path: relayer submits, identifier matches, owner is platform-custodial,
             //    and the `Registered` event is emitted with the right indexed identifier.
+            // The `Registered` event signature uses `uint128 indexed identifier`;
+            // `expected` is parsed as `uint256` from the JSON, but every reference
+            // vector fits in 128 bits, so the downcast is bounded by the fixture.
             vm.expectEmit(true, false, false, true, address(registrar));
+            // forge-lint: disable-next-line(unsafe-typecast)
             emit HumanbasedRegistrar.Registered(uint128(expected), platformOwner);
 
             vm.prank(relayer);
