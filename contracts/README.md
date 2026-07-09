@@ -40,6 +40,31 @@ $ forge fmt
 bash deploy.sh
 ```
 
+The `deploy.sh` helper runs `DIDRegistry.s.sol` and `DIDRegistrar.s.sol` in
+order against the local anvil node. For a production deployment, run the
+scripts directly (see below) with the appropriate RPC URL and
+`--broadcast`.
+
+#### Deploy scripts
+
+Each script reads prior contract addresses from `script/deployment.json`
+and writes the new address back on success. Run with
+`forge script script/<file>.s.sol:<Contract>Script --rpc-url <url> --broadcast`.
+
+| Script | Env vars | Persists to `deployment.json` |
+| --- | --- | --- |
+| `DIDRegistry.s.sol` | `DEPLOYER_PRIVATE_KEY`, `OWNER` | `registryImpl`, `registryProxy` |
+| `DIDRegistrar.s.sol` | `DEPLOYER_PRIVATE_KEY` | `registrar` |
+| `InviteRegistrar.s.sol` | `DEPLOYER_PRIVATE_KEY`, `INVITE_SIGNER` | `inviteRegistrar` |
+| `HumanbasedRegistrar.s.sol` | `DEPLOYER_PRIVATE_KEY`, `RELAYER_ADDRESS`, `PLATFORM_OWNER_ADDRESS` | `humanbasedRegistrar` |
+| `Upgrade.s.sol` | `DEPLOYER_PRIVATE_KEY` | (no new addresses; upgrades the proxy in place) |
+
+All scripts require `DEPLOYER_PRIVATE_KEY`. `OWNER` / `INVITE_SIGNER` /
+`RELAYER_ADDRESS` / `PLATFORM_OWNER_ADDRESS` are role-specific addresses
+that must be distinct from the deployer. The deployer account pays gas
+and (for `HumanbasedRegistrar.s.sol`) becomes the contract's
+admin / Ownable owner.
+
 ### Upgrade
 
 ```shell

@@ -106,7 +106,11 @@ contract E2EPrecomputeTest is Test {
 
             // 4. Full register path: relayer submits, identifier matches, owner is platform-custodial,
             //    and the `Registered` event is emitted with the right indexed identifier.
+            // The `Registered` event signature uses `uint128 indexed identifier`;
+            // `expected` is parsed as `uint256` from the JSON, but every reference
+            // vector fits in 128 bits, so the downcast is bounded by the fixture.
             vm.expectEmit(true, false, false, true, address(registrar));
+            // forge-lint: disable-next-line(unsafe-typecast)
             emit HumanbasedRegistrar.Registered(uint128(expected), platformOwner);
 
             vm.prank(relayer);
@@ -123,25 +127,41 @@ contract E2EPrecomputeTest is Test {
         uint256 count = vm.parseJsonUint(json, ".count");
         require(count > 0, "no vectors");
 
-        // Use the first vector as the target; verify register-twice is a no-op.
-        string memory first = vm.parseJsonString(json, ".vectors[0].userId");
-        uint256 firstExpected = vm.parseJsonUint(json, ".vectors[0].identifier");
+        // Use the canonical happy-path user id (referenced by key, not by
+        // .vectors[i] index) so reordering the vectors array doesn't
+        // silently change which user_id gets the idempotency check.
+        string memory canonical = vm.parseJsonString(json, ".canonicalHappyPathUserId");
+        uint256 canonicalExpected =
+            vm.parseJsonUint(json, string.concat(".vectors[", _indexOfUserId(json, canonical), "].identifier"));
 
         vm.prank(relayer);
-        uint128 first1 = registrar.register(first);
+        uint128 first1 = registrar.register(canonical);
         vm.prank(relayer);
-        uint128 first2 = registrar.register(first);
-        assertEq(uint256(first1), firstExpected);
+        uint128 first2 = registrar.register(canonical);
+        assertEq(uint256(first1), canonicalExpected);
         assertEq(first2, first1);
         assertEq(proxy.getOwnedDids(platformOwner).length, 1);
 
         // Register all other vectors; each adds a new DID for the same platform owner.
-        for (uint256 i = 1; i < count; i++) {
+        for (uint256 i = 0; i < count; i++) {
             string memory userId = vm.parseJsonString(json, string.concat(".vectors[", vm.toString(i), "].userId"));
+            if (keccak256(bytes(userId)) == keccak256(bytes(canonical))) continue;
             vm.prank(relayer);
             registrar.register(userId);
         }
         assertEq(proxy.getOwnedDids(platformOwner).length, count);
+    }
+
+    /// @dev Look up the index of a userId in the .vectors array. Reverts if absent.
+    function _indexOfUserId(string memory json, string memory target) internal pure returns (string memory) {
+        uint256 count = vm.parseJsonUint(json, ".count");
+        for (uint256 i = 0; i < count; i++) {
+            string memory userId = vm.parseJsonString(json, string.concat(".vectors[", vm.toString(i), "].userId"));
+            if (keccak256(bytes(userId)) == keccak256(bytes(target))) {
+                return vm.toString(i);
+            }
+        }
+        revert("canonicalHappyPathUserId not found in .vectors");
     }
 
     /// @notice The non-relayer path is rejected at the E2E level. The contract's
