@@ -17,14 +17,14 @@ import {DeploymentLib} from "./DeploymentLib.sol";
 ///   RELAYER_ADDRESS       — backend relayer; the only address allowed to call `register`
 ///   PLATFORM_OWNER_ADDRESS — platform-custodial address recorded as the DID owner
 ///
-/// Reads `registryProxy` from script/deployment.json and writes
+/// Reads `registryProxy` from script/deployment.<network>.json and writes
 /// `humanbasedRegistrar` back on success.
 contract HumanbasedRegistrarScript is Script {
     HumanbasedRegistrar public humanbasedRegistrar;
 
     function run() public {
         DeploymentLib.Deployment memory d = DeploymentLib.load();
-        require(d.registryProxy != address(0), "registryProxy missing in deployment.json");
+        require(d.registryProxy != address(0), "registryProxy missing in deployment file");
 
         address relayer = vm.envAddress("RELAYER_ADDRESS");
         address platformOwner = vm.envAddress("PLATFORM_OWNER_ADDRESS");

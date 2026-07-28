@@ -14,7 +14,7 @@ contract UpgradeScript is Script {
 
     function run() public {
         DeploymentLib.Deployment memory d = DeploymentLib.load();
-        require(d.registryProxy != address(0), "registryProxy missing in deployment.json");
+        require(d.registryProxy != address(0), "registryProxy missing in deployment file");
 
         uint256 deployer = vm.envUint("DEPLOYER_PRIVATE_KEY");
 
@@ -33,7 +33,7 @@ contract UpgradeScript is Script {
 
     function upgradeToV2() public {
         DeploymentLib.Deployment memory d = DeploymentLib.load();
-        require(d.registryProxy != address(0), "registryProxy missing in deployment.json");
+        require(d.registryProxy != address(0), "registryProxy missing in deployment file");
 
         uint256 deployer = vm.envUint("DEPLOYER_PRIVATE_KEY");
 
