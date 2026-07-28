@@ -47,11 +47,26 @@ scripts directly (see below) with the appropriate RPC URL and
 
 #### Deploy scripts
 
-Each script reads prior contract addresses from `script/deployment.json`
-and writes the new address back on success. Run with
+Each script reads prior contract addresses from
+`script/deployment.<network>.json` and writes the new address back on
+success. Run with
 `forge script script/<file>.s.sol:<Contract>Script --rpc-url <url> --broadcast`.
 
-| Script | Env vars | Persists to `deployment.json` |
+`<network>` is derived from the chain id of whatever `--rpc-url` points at,
+using the map in `script/networks.json` (e.g. `84532` → `base_sepolia`). An
+unmapped chain id falls back to its decimal form
+(`deployment.31338.json`), so deploying to a new chain needs no
+configuration — add an entry to `networks.json` only if you want a readable
+filename.
+
+Every deployment file records its own `chainId`. That field, not the
+filename, is what the scripts validate: loading or overwriting a file whose
+`chainId` differs from the chain being talked to reverts with
+`ChainIdMismatch` instead of silently pairing one network's addresses with
+another network's RPC. Files predating this field are read as-is and gain
+one on the next write.
+
+| Script | Env vars | Persists to `deployment.<network>.json` |
 | --- | --- | --- |
 | `DIDRegistry.s.sol` | `DEPLOYER_PRIVATE_KEY`, `OWNER` | `registryImpl`, `registryProxy` |
 | `DIDRegistrar.s.sol` | `DEPLOYER_PRIVATE_KEY` | `registrar` |
