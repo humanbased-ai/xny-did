@@ -4,3 +4,8 @@
 # OMC runtime
 .omc/
 .tasks/
+
+# Superseded by per-network deployment.<network>.json files, which are tracked
+contracts/script/deployment.json
+# Local anvil deployments are throwaway
+contracts/script/deployment.local.json
