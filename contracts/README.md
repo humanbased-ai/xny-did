@@ -80,6 +80,30 @@ that must be distinct from the deployer. The deployer account pays gas
 and (for `HumanbasedRegistrar.s.sol`) becomes the contract's
 admin / Ownable owner.
 
+#### Admin rotations
+
+`HumanbasedRegistrarAdmin.s.sol` rotates the two `onlyOwner` addresses on an
+already-deployed `HumanbasedRegistrar`. It reads the contract address from
+`deployment.<network>.json` and requires `DEPLOYER_PRIVATE_KEY` to be that
+contract's owner — a wrong key is rejected locally, before broadcasting.
+Setting a value to what it already is exits as a no-op.
+
+```shell
+forge script script/HumanbasedRegistrarAdmin.s.sol:HumanbasedRegistrarAdminScript \
+  --sig 'setRelayer()' --rpc-url <url> --broadcast        # reads RELAYER_ADDRESS
+
+forge script script/HumanbasedRegistrarAdmin.s.sol:HumanbasedRegistrarAdminScript \
+  --sig 'setPlatformOwner()' --rpc-url <url> --broadcast  # reads PLATFORM_OWNER_ADDRESS
+```
+
+`relayer` is a single address, not a set, so rotating it is a hard cutover:
+the old relayer's `register` calls start reverting `NotRelayer` the moment the
+transaction lands. Point the backend at the new key first.
+
+`setPlatformOwner` only affects subsequent registrations. Already-registered
+DIDs keep their existing owner, and their claim path still runs through that
+address; migrating them requires `transferOwner` signed by the current owner.
+
 ### Upgrade
 
 ```shell
