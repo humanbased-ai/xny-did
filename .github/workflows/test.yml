@@ -1,7 +1,12 @@
 name: CI
 
 on:
+  # `pull_request` covers branches under review, so scope `push` to main —
+  # a bare `push:` matched both events and ran the identical job twice per PR.
+  # Consequence: a branch with no open PR gets no run; use workflow_dispatch
+  # if you want one before opening the PR.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
