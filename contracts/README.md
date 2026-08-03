@@ -80,6 +80,22 @@ that must be distinct from the deployer. The deployer account pays gas
 and (for `HumanbasedRegistrar.s.sol`) becomes the contract's
 admin / Ownable owner.
 
+#### Explorer verification
+
+Add `--verify` to any deploy script to submit sources to Basescan as part of
+the same run, with `BASESCAN_API_KEY` in the environment:
+
+```shell
+BASESCAN_API_KEY=<key> DEPLOYER_PRIVATE_KEY=<key> OWNER=<address> \
+  forge script script/DIDRegistry.s.sol:DIDRegistryScript \
+  --rpc-url base --broadcast --verify
+```
+
+`foundry.toml`'s `[etherscan]` section maps both `base` (8453) and
+`base_sepolia` (84532) to that variable. Verifying at deploy time is easier
+than after the fact — a later `forge verify-contract` has to be given the
+compiler version and constructor arguments by hand.
+
 #### Admin rotations
 
 `HumanbasedRegistrarAdmin.s.sol` rotates the two `onlyOwner` addresses on an
