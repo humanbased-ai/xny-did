@@ -8,35 +8,35 @@ from pathlib import Path
 import time
 from web3.middleware import ExtraDataToPOAMiddleware
 
+import deployment as deployment_lib
+
 # Read ABI file
 current_dir = Path(__file__).parent
 abi_path = current_dir / "DIDRegistrar.json"
 with abi_path.open("r", encoding="utf-8") as file:
     abi = json.load(file)
 
-# Read contract address
-deployment_path = current_dir / "deployment.json"
-with deployment_path.open("r", encoding="utf-8") as file:
-    contract_address = json.load(file)["registrar"]
-
 # Load .env file
 load_dotenv()
 
 # Read environment variables
 private_key = os.getenv("USER_PRIVATE_KEY")
-rpc_url = os.getenv("KITE_TEST_PRC_URL")
+rpc_url = deployment_lib.rpc_url()
 
-# print(private_key)
-print("contract_address", contract_address)
 print("rpc_url", rpc_url)
 
 # Check if the environment variables are set
-assert private_key and contract_address and rpc_url, "check your .env file"
+assert private_key and rpc_url, "check your .env file"
 
 # connect to the blockchain network
 web3 = Web3(Web3.HTTPProvider(rpc_url))
-# print("connected:", web3.is_connected())
-# print("chain_id:", web3.eth.chain_id)
+
+# Resolve addresses for whichever chain the RPC is on — after connecting, since
+# the deployment file is selected by chain id and validated against it.
+deployment = deployment_lib.load_deployment(web3)
+contract_address = deployment_lib.require_address(deployment, "registrar")
+print("chain_id", web3.eth.chain_id)
+print("contract_address", contract_address)
 
 # create a contract instance
 contract = web3.eth.contract(address=contract_address, abi=abi)
@@ -89,27 +89,23 @@ print(
 
 
 def get_event(event_name, receipt):
-    # Read ABI file
-    current_dir = Path(__file__).parent
+    # Events are emitted by the registry, not the registrar, so this needs the
+    # registry ABI and address. Both come from the already-loaded deployment and
+    # the existing connection — re-reading the file and re-connecting here would
+    # risk resolving against a different chain than the transaction was sent to.
     abi_path = current_dir / "DIDRegistry.json"
     with abi_path.open("r", encoding="utf-8") as file:
-        abi = json.load(file)
+        registry_abi = json.load(file)
 
-    # Read contract address
-    deployment_path = current_dir / "deployment.json"
-    with deployment_path.open("r", encoding="utf-8") as file:
-        contract_address = json.load(file)["registryProxy"]
-
-    # connect to the blockchain network
-    web3 = Web3(Web3.HTTPProvider(rpc_url))
-
-    # create a contract instance
-    contract = web3.eth.contract(address=contract_address, abi=abi)
+    registry_address = deployment_lib.require_address(deployment, "registryProxy")
+    contract = web3.eth.contract(address=registry_address, abi=registry_abi)
 
     events = contract.events[event_name]().process_receipt(receipt)
 
     for e in events:
+        # DIDRegistered carries (identifier, owner) only — printing args covers
+        # both. An earlier `e['args']['data']` here always raised KeyError, so
+        # this function had never run to completion.
         print("Event args:", e['args'])
-        print("Stored data:", e['args']['data'])
 
 get_event("DIDRegistered", receipt)
