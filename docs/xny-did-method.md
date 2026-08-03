@@ -283,13 +283,50 @@ Compatible with existing TON wallet login.
 
 It is **RECOMMENDED** to store `tonAddress` as a salted hash.
 
+## Authoritative Deployment
+
+The `<method-specific-id>` carries no chain information, and a deterministic
+derivation yields the same identifier on every chain (see
+[Method-Specific Identifier](#method-specific-identifier)). The same identifier
+may therefore be registered in more than one registry deployment, and those
+deployments may hold different documents for it.
+
+[DID Core](https://www.w3.org/TR/did-core/) §7.1 defines resolution as a process
+that takes a DID and returns a DID Document, and defers the `Read` operation to
+each DID method. It does not itself say what a resolver should do when the same
+identifier exists in more than one place, so this method settles it: a `did:xny`
+deployment topology **MUST** designate exactly one *authoritative deployment*,
+and resolvers **MUST** resolve against that deployment only.
+
+For `did:xny`, the authoritative deployment is the DID registry on **Base
+mainnet** (chain ID `8453`). Its contract address is published with the
+deployment records in the method's implementation repository rather than inlined
+here, so that a redeployment does not require a revision of this specification.
+
+This has three consequences:
+
+- A registration that exists only in a non-authoritative deployment is **not** a
+  resolvable `did:xny` DID. Resolvers **MUST NOT** fall back to a
+  non-authoritative deployment when the authoritative registry holds no record
+  of an identifier; the correct outcome is *notFound* (see
+  [Resolve](#read-resolve)).
+- Deployments on test networks — for example Base Sepolia (chain ID `84532`) —
+  exist for development and **MUST NOT** be served through a publicly advertised
+  `did:xny` resolver.
+- The rule constrains only which document is authoritative. It changes neither
+  identifier syntax nor derivation: a precomputed identifier stays byte-identical
+  across chains, which is what lets a subject hold an identifier before any
+  registration exists.
+
 ## Operations
 
 Operations are defined here in terms of their inputs, the authorization and
 processing they require, and their outputs. They are described abstractly so the
 method remains chain-independent: the concrete on-chain binding — which chain a
 deployment uses, the registry contract, and the transaction encoding — is
-**deployment-specific and out of scope of this specification**. In a deployment,
+**deployment-specific and out of scope of this specification**. Which deployment
+is authoritative for *resolution* is not out of scope; it is fixed by
+[Authoritative Deployment](#authoritative-deployment). In a deployment,
 write operations are submitted as transactions to an on-chain DID registry that
 stores and verifies permissions; an off-chain resolver indexes the resulting
 state and serves the assembled DID Document (see [Storage Model](#storage-model)).
@@ -332,9 +369,10 @@ cost, or gating registration to an authorized relayer.
 
 - **Input:** a `did:xny` DID.
 - **Processing:** the resolver validates the identifier syntax, looks up the
-  current registry state for that DID, and assembles a W3C DID Document. The
-  on-chain registry additionally exposes the document for direct, highest-trust
-  reads.
+  current state for that DID in the authoritative registry (see
+  [Authoritative Deployment](#authoritative-deployment)), and assembles a W3C DID
+  Document. The on-chain registry additionally exposes the document for direct,
+  highest-trust reads.
 - **Output:** a [DID Resolution Result](https://w3c.github.io/did-resolution/) —
   `didDocument`, `didResolutionMetadata`, and `didDocumentMetadata` — or, when the
   client requests a bare document representation, the DID Document itself.
