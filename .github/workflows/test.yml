@@ -13,6 +13,16 @@ env:
   # via `vm.envString("PYTHON_BIN")`; defaults to `python3` on PATH if unset.
   PYTHON_BIN: .venv/bin/python3
 
+# This workflow has to live at the repository root — GitHub Actions ignores
+# .github/workflows anywhere else — but every `run` step below targets the
+# Foundry project, so default them into contracts/ rather than prefixing each
+# one. `uses` steps are unaffected, which is what actions/checkout wants.
+# PYTHON_BIN above stays relative to this directory: Foundry invokes ffi from
+# the project root, so `.venv/bin/python3` resolves under contracts/.
+defaults:
+  run:
+    working-directory: contracts
+
 jobs:
   check:
     name: Foundry project
