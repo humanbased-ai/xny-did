@@ -1,8 +1,8 @@
 {
-  "mainnet": {
+  "base-sepolia": {
     "DIDRegistry": {
-      "address": "0x3DB4e80aE23AF99BA2a92Aa54E204c03766ce562",
-      "startBlock": 37759471
+      "address": "0x49bc9d93B52367b9Fc173C5bA206d0202A89643a",
+      "startBlock": 34957425
     }
   }
 }
