@@ -4,6 +4,7 @@
 # OMC runtime
 .omc/
 .tasks/
+.worktrees/
 
 # Superseded by per-network deployment.<network>.json files, which are tracked
 contracts/script/deployment.json

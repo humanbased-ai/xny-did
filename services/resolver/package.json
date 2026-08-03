@@ -8,7 +8,7 @@
     "start": "node index.js",
     "test": "node --test"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": true,
   "dependencies": {
     "config": "^4.1.1",
