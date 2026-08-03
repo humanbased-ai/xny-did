@@ -67,3 +67,26 @@ jobs:
         run: |
           forge test -vvv
         id: test
+
+  # Separate job rather than a step in the one above, so a Python failure is
+  # distinguishable from a Solidity one at a glance. Needs neither Foundry nor
+  # the submodule checkout — script/deployment.py has no contract dependencies.
+  python:
+    name: Python scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dev dependencies
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -r script/requirements-dev.txt
+
+      - name: Run pytest
+        run: |
+          .venv/bin/pytest script/tests -v
+        id: pytest
