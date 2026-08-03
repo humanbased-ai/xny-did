@@ -9,35 +9,37 @@ from web3.middleware import ExtraDataToPOAMiddleware
 import argparse
 import sys
 
+import deployment as deployment_lib
+
 # Read ABI file
 current_dir = Path(__file__).parent
 abi_path = current_dir / "DIDRegistry.json"
 with abi_path.open("r", encoding="utf-8") as file:
     abi = json.load(file)
 
-# Read contract address
-deployment_path = current_dir / "deployment.json"
-with deployment_path.open("r", encoding="utf-8") as file:
-    contract_address = json.load(file)["registryProxy"]
-
 # Load .env file
 load_dotenv()
 
 # Read environment variables
 private_key = os.getenv("OWNER_PRIVATE_KEY")
-rpc_url = os.getenv("KITE_TEST_PRC_URL")
+rpc_url = deployment_lib.rpc_url()
 
-# print(private_key)
-print("contract_address", contract_address)
 print("rpc_url", rpc_url)
 
 # Check if the environment variables are set
-assert private_key and contract_address and rpc_url, "check your .env file"
+assert private_key and rpc_url, "check your .env file"
 
 # connect to the blockchain network
 web3 = Web3(Web3.HTTPProvider(rpc_url))
-# print("connected:", web3.is_connected())
-# print("chain_id:", web3.eth.chain_id)
+
+# Resolve the contract address for whichever chain the RPC is on. This has to
+# come after connecting: the deployment file is selected by chain id, and its
+# recorded chainId is checked against the live one, so a mismatched RPC fails
+# here instead of querying the wrong chain with the wrong addresses.
+deployment = deployment_lib.load_deployment(web3)
+contract_address = deployment_lib.require_address(deployment, "registryProxy")
+print("chain_id", web3.eth.chain_id)
+print("contract_address", contract_address)
 
 # create a contract instance
 contract = web3.eth.contract(address=contract_address, abi=abi)

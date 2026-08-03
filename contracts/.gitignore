@@ -23,6 +23,8 @@ broadcast/
 # Python
 __pycache__/
 *.pyc
+# Project-local venv for the script/ helpers; CI recreates it per run
+.venv/
 
 # OMC runtime
 .omc/
