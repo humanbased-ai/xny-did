@@ -31,12 +31,7 @@ contract InviteRegistrar is Ownable {
     // nonce → used (prevent replay)
     mapping(uint256 => bool) public usedNonces;
 
-    event InviteRegistered(
-        uint128 indexed identifier,
-        address indexed owner,
-        address indexed inviter,
-        uint256 nonce
-    );
+    event InviteRegistered(uint128 indexed identifier, address indexed owner, address indexed inviter, uint256 nonce);
 
     event SignerUpdated(address oldSigner, address newSigner);
 
@@ -51,11 +46,7 @@ contract InviteRegistrar is Ownable {
      * @param nonce Unique nonce for this invite (prevents replay)
      * @param signature Invite Service's signature over (inviter, owner, nonce, chainId, contractAddress)
      */
-    function registerWithInvite(
-        address inviter,
-        uint256 nonce,
-        bytes calldata signature
-    ) external {
+    function registerWithInvite(address inviter, uint256 nonce, bytes calldata signature) external {
         _register(msg.sender, inviter, nonce, signature);
     }
 
@@ -68,28 +59,16 @@ contract InviteRegistrar is Ownable {
      * @param nonce Unique nonce for this invite (prevents replay)
      * @param signature Invite Service's signature over (inviter, owner, nonce, chainId, contractAddress)
      */
-    function registerFor(
-        address owner,
-        address inviter,
-        uint256 nonce,
-        bytes calldata signature
-    ) external {
+    function registerFor(address owner, address inviter, uint256 nonce, bytes calldata signature) external {
         require(owner != address(0), "Invalid owner");
         _register(owner, inviter, nonce, signature);
     }
 
-    function _register(
-        address owner,
-        address inviter,
-        uint256 nonce,
-        bytes calldata signature
-    ) internal {
+    function _register(address owner, address inviter, uint256 nonce, bytes calldata signature) internal {
         require(!usedNonces[nonce], "Invite already used");
 
         // Verify signature: Invite Service signed (inviter, owner, nonce, chainId, contractAddress)
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(inviter, owner, nonce, block.chainid, address(this))
-        );
+        bytes32 messageHash = keccak256(abi.encodePacked(inviter, owner, nonce, block.chainid, address(this)));
         bytes32 ethSignedHash = messageHash.toEthSignedMessageHash();
         address recovered = ethSignedHash.recover(signature);
         require(recovered == inviteSigner, "Invalid invite signature");
