@@ -14,6 +14,16 @@ kite_test = "${KITE_TEST_PRC_URL}"
 base = "https://mainnet.base.org"
 base_sepolia = "https://base-sepolia.drpc.org"
 
+# Explorer verification, for `forge script ... --verify` / `forge verify-contract`.
+# `chain` is set explicitly rather than inferred from the section name: the
+# rpc_endpoints aliases above use underscores, while Foundry's own chain alias is
+# `base-sepolia`, so name-based resolution would be fragile. The API URL is
+# deliberately omitted so Foundry uses its built-in endpoint per chain id and keeps
+# working as the explorer's API evolves.
+[etherscan]
+base = { key = "${BASESCAN_API_KEY}", chain = 8453 }
+base_sepolia = { key = "${BASESCAN_API_KEY}", chain = 84532 }
+
 # Test profile: opts into `vm.ffi` for the E2E precompute test
 # (E2EPrecomputeTest invokes script/did_identifier.py to verify cross-language
 # byte-match). Off by default to keep the security posture tight — `vm.ffi`
