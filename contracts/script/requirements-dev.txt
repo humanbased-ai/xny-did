@@ -1,0 +1,4 @@
+# Test-only dependencies. Kept out of requirements.txt so a runtime install
+# (and the Foundry E2E test's venv) stays free of test packages.
+-r requirements.txt
+pytest>=8.0
