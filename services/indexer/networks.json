@@ -1,4 +1,10 @@
 {
+  "base": {
+    "DIDRegistry": {
+      "address": "0xf73eD23b998b3987503F4F4Ba4eAb85386ebfCC4",
+      "startBlock": 49520325
+    }
+  },
   "base-sepolia": {
     "DIDRegistry": {
       "address": "0x49bc9d93B52367b9Fc173C5bA206d0202A89643a",
