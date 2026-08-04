@@ -29,7 +29,7 @@ accident.
 ## Adding a network
 
 Copy `registryProxy` and its deployment block out of
-`contracts/script/deployment.<network>.json` into `networks.json`:
+`contracts/script/config/deployment.<network>.json` into `networks.json`:
 
 ```json
 {
