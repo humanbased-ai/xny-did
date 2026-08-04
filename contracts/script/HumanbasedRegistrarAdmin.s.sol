@@ -12,9 +12,13 @@ import {DeploymentLib} from "./DeploymentLib.sol";
 /// applies — one network's registrar cannot be addressed over another network's RPC.
 ///
 /// Env vars:
-///   DEPLOYER_PRIVATE_KEY   — must be the contract's Ownable owner
-///   RELAYER_ADDRESS        — new relayer (setRelayer only)
-///   PLATFORM_OWNER_ADDRESS — new platform-custodial owner (setPlatformOwner only)
+///   DEPLOYER_PRIVATE_KEY — must be the contract's Ownable owner
+///
+/// The target values come from script/roles.<network>.json, which makes that file the
+/// desired state and this script the thing that makes the chain converge to it. Edit the
+/// file, run the script, and the file stays equal to what is on chain. Taking the new
+/// address from the environment instead would let the file drift the moment anyone
+/// rotates — which is what the addresses lived in .env for, before IN-2861.
 ///
 /// Usage:
 ///   forge script script/HumanbasedRegistrarAdmin.s.sol:HumanbasedRegistrarAdminScript \
@@ -30,7 +34,9 @@ contract HumanbasedRegistrarAdminScript is Script {
     /// @notice Rotate the relayer — the only address allowed to call `register`.
     function setRelayer() public {
         (HumanbasedRegistrar registrar, uint256 deployer) = _loadAsOwner();
-        address newRelayer = vm.envAddress("RELAYER_ADDRESS");
+        DeploymentLib.Roles memory roles = DeploymentLib.loadRoles();
+        DeploymentLib.requireRole(roles.relayer, "relayer");
+        address newRelayer = roles.relayer;
         address current = registrar.relayer();
 
         if (current == newRelayer) {
@@ -53,7 +59,9 @@ contract HumanbasedRegistrarAdminScript is Script {
     ///      migrating them requires `transferOwner` signed by the current owner.
     function setPlatformOwner() public {
         (HumanbasedRegistrar registrar, uint256 deployer) = _loadAsOwner();
-        address newPlatformOwner = vm.envAddress("PLATFORM_OWNER_ADDRESS");
+        DeploymentLib.Roles memory roles = DeploymentLib.loadRoles();
+        DeploymentLib.requireRole(roles.platformOwner, "platformOwner");
+        address newPlatformOwner = roles.platformOwner;
         address current = registrar.platformOwner();
 
         if (current == newPlatformOwner) {

@@ -66,19 +66,51 @@ filename, is what the scripts validate: loading or overwriting a file whose
 another network's RPC. Files predating this field are read as-is and gain
 one on the next write.
 
-| Script | Env vars | Persists to `deployment.<network>.json` |
+| Script | Roles used | Persists to `deployment.<network>.json` |
 | --- | --- | --- |
-| `DIDRegistry.s.sol` | `DEPLOYER_PRIVATE_KEY`, `OWNER` | `registryImpl`, `registryProxy` |
-| `DIDRegistrar.s.sol` | `DEPLOYER_PRIVATE_KEY` | `registrar` |
-| `InviteRegistrar.s.sol` | `DEPLOYER_PRIVATE_KEY`, `INVITE_SIGNER` | `inviteRegistrar` |
-| `HumanbasedRegistrar.s.sol` | `DEPLOYER_PRIVATE_KEY`, `RELAYER_ADDRESS`, `PLATFORM_OWNER_ADDRESS` | `humanbasedRegistrar` |
-| `Upgrade.s.sol` | `DEPLOYER_PRIVATE_KEY` | (no new addresses; upgrades the proxy in place) |
+| `DIDRegistry.s.sol` | `owner` | `registryImpl`, `registryProxy` |
+| `DIDRegistrar.s.sol` | — | `registrar` |
+| `InviteRegistrar.s.sol` | `inviteSigner` | `inviteRegistrar` |
+| `HumanbasedRegistrar.s.sol` | `relayer`, `platformOwner` | `humanbasedRegistrar` |
+| `Upgrade.s.sol` | — | (no new addresses; upgrades the proxy in place) |
 
-All scripts require `DEPLOYER_PRIVATE_KEY`. `OWNER` / `INVITE_SIGNER` /
-`RELAYER_ADDRESS` / `PLATFORM_OWNER_ADDRESS` are role-specific addresses
-that must be distinct from the deployer. The deployer account pays gas
-and (for `HumanbasedRegistrar.s.sol`) becomes the contract's
-admin / Ownable owner.
+`DEPLOYER_PRIVATE_KEY` is the only environment variable the deploy scripts
+read. The deployer pays gas and (for the registrar scripts) becomes the
+contract's admin / Ownable owner.
+
+#### Role addresses
+
+Role addresses live in `script/roles.<network>.json`, not in `.env`:
+
+```json
+{
+  "chainId": 84532,
+  "owner": "0x...",
+  "relayer": "0x...",
+  "platformOwner": "0x...",
+  "inviteSigner": "0x..."
+}
+```
+
+They are not secrets — only private keys are — and keeping them in a
+chainId-validated file means **switching networks requires changing no
+address in `.env`**. Foundry auto-loads a single `contracts/.env` and has no
+`--env-file` flag, so when these addresses lived there, changing network
+meant editing them in place; missing one produced a successful deployment
+with the wrong configuration rather than an error. `relayer` can be rotated
+afterwards, but `owner` is fixed at `initialize()` and cannot be, so that
+mistake means redeploying.
+
+A missing roles file is an error rather than a fallback to the environment —
+recovering the old behaviour silently would defeat the point. There is
+deliberately no `roles.base.json` until the mainnet addresses are settled;
+a missing file failing loudly beats a placeholder that deploys stale values.
+
+`HumanbasedRegistrarAdmin.s.sol` reads its target values from the same file,
+which makes it the desired state and the script the thing that converges the
+chain to it: edit the file, run the script, and the file stays equal to what
+is on chain. Taking the new address from the environment instead would let
+the file drift the moment anyone rotates.
 
 #### Explorer verification
 

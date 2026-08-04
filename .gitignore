@@ -8,5 +8,6 @@
 
 # Superseded by per-network deployment.<network>.json files, which are tracked
 contracts/script/deployment.json
-# Local anvil deployments are throwaway
+# Local anvil deployments and their role config are throwaway
 contracts/script/deployment.local.json
+contracts/script/roles.local.json

@@ -9,9 +9,9 @@ import {DeploymentLib} from "./DeploymentLib.sol";
 ///
 /// Env vars:
 ///   DEPLOYER_PRIVATE_KEY — deployer key
-///   INVITE_SIGNER        — invite service signing address
 ///
-/// Reads `registryProxy` from script/deployment.<network>.json.
+/// `inviteSigner` comes from script/roles.<network>.json. Reads `registryProxy`
+/// from script/deployment.<network>.json.
 contract InviteRegistrarScript is Script {
     InviteRegistrar public inviteRegistrar;
 
@@ -19,8 +19,13 @@ contract InviteRegistrarScript is Script {
         DeploymentLib.Deployment memory d = DeploymentLib.load();
         require(d.registryProxy != address(0), "registryProxy missing in deployment file");
 
-        address inviteSigner = vm.envAddress("INVITE_SIGNER");
+        DeploymentLib.Roles memory roles = DeploymentLib.loadRoles();
+        DeploymentLib.requireRole(roles.inviteSigner, "inviteSigner");
+        address inviteSigner = roles.inviteSigner;
         uint256 deployer = vm.envUint("DEPLOYER_PRIVATE_KEY");
+
+        console.log("chain id:", block.chainid);
+        console.log("inviteSigner:", inviteSigner);
 
         vm.startBroadcast(deployer);
         inviteRegistrar = new InviteRegistrar(d.registryProxy, inviteSigner);
