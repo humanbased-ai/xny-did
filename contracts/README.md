@@ -78,6 +78,28 @@ one on the next write.
 read. The deployer pays gas and (for the registrar scripts) becomes the
 contract's admin / Ownable owner.
 
+#### What `.env` needs
+
+`contracts/.env` is gitignored and auto-loaded by Foundry — for `forge test` as
+well as `forge script`, so it holds secrets only:
+
+| Variable | Needed for | Notes |
+| --- | --- | --- |
+| `DEPLOYER_PRIVATE_KEY` | every deploy / admin script | pays gas |
+| `BASE_RPC_URL` | `--rpc-url base` | paid node; the URL embeds an API key, which is why it is not in `foundry.toml` |
+| `BASESCAN_API_KEY` | `--verify` | |
+| `OWNER_PRIVATE_KEY` | `manager.py` | |
+| `USER_PRIVATE_KEY` | `register.py` | |
+| `RPC_URL` | the Python scripts | falls back to `KITE_TEST_PRC_URL` |
+
+**No address belongs in `.env`.** Role addresses live in
+`script/config/roles.<network>.json` and contract addresses in
+`script/config/deployment.<network>.json`, both validated against the connected
+chain id. Switching networks therefore means changing `BASE_RPC_URL` and the key,
+not hunting through addresses — and `OWNER` / `RELAYER_ADDRESS` /
+`PLATFORM_OWNER_ADDRESS` / `INVITE_SIGNER` are no longer read at all, so leaving
+stale copies in `.env` has no effect.
+
 #### Role addresses
 
 Role addresses live in `script/config/roles.<network>.json`, not in `.env`:
@@ -118,7 +140,7 @@ Add `--verify` to any deploy script to submit sources to Basescan as part of
 the same run, with `BASESCAN_API_KEY` in the environment:
 
 ```shell
-BASESCAN_API_KEY=<key> DEPLOYER_PRIVATE_KEY=<key> OWNER=<address> \
+BASESCAN_API_KEY=<key> DEPLOYER_PRIVATE_KEY=<key> \
   forge script script/DIDRegistry.s.sol:DIDRegistryScript \
   --rpc-url base --broadcast --verify
 ```
@@ -138,10 +160,10 @@ Setting a value to what it already is exits as a no-op.
 
 ```shell
 forge script script/HumanbasedRegistrarAdmin.s.sol:HumanbasedRegistrarAdminScript \
-  --sig 'setRelayer()' --rpc-url <url> --broadcast        # reads RELAYER_ADDRESS
+  --sig 'setRelayer()' --rpc-url <url> --broadcast        # target: roles.relayer
 
 forge script script/HumanbasedRegistrarAdmin.s.sol:HumanbasedRegistrarAdminScript \
-  --sig 'setPlatformOwner()' --rpc-url <url> --broadcast  # reads PLATFORM_OWNER_ADDRESS
+  --sig 'setPlatformOwner()' --rpc-url <url> --broadcast  # target: roles.platformOwner
 ```
 
 `relayer` is a single address, not a set, so rotating it is a hard cutover:
