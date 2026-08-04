@@ -6,8 +6,8 @@ failure mode it prevents — operating on one chain with another chain's contrac
 addresses — is silent, so the cases where validation might *quietly not happen*
 (a quoted chainId, a missing one, a malformed one) are pinned down explicitly.
 
-`_SCRIPT_DIR` is monkeypatched to a tmp_path so no test reads or writes the real
-deployment records.
+`_CONFIG_DIR` is monkeypatched to a tmp_path so no test reads or writes the real
+config files.
 """
 
 import json
@@ -30,18 +30,18 @@ class FakeWeb3:
 
 
 @pytest.fixture
-def script_dir(tmp_path, monkeypatch):
+def config_dir(tmp_path, monkeypatch):
     """Redirect the loader at a scratch directory."""
-    monkeypatch.setattr(deployment_lib, "_SCRIPT_DIR", tmp_path)
+    monkeypatch.setattr(deployment_lib, "_CONFIG_DIR", tmp_path)
     return tmp_path
 
 
-def write_networks(script_dir, mapping):
-    (script_dir / "networks.json").write_text(json.dumps(mapping), encoding="utf-8")
+def write_networks(config_dir, mapping):
+    (config_dir / "networks.json").write_text(json.dumps(mapping), encoding="utf-8")
 
 
-def write_deployment(script_dir, name, record):
-    path = script_dir / f"deployment.{name}.json"
+def write_deployment(config_dir, name, record):
+    path = config_dir / f"deployment.{name}.json"
     path.write_text(json.dumps(record), encoding="utf-8")
     return path
 
@@ -49,25 +49,25 @@ def write_deployment(script_dir, name, record):
 # --- network_name -----------------------------------------------------------
 
 
-def test_network_name_uses_the_map(script_dir):
-    write_networks(script_dir, {"8453": "base", "84532": "base_sepolia"})
+def test_network_name_uses_the_map(config_dir):
+    write_networks(config_dir, {"8453": "base", "84532": "base_sepolia"})
     assert deployment_lib.network_name(8453) == "base"
     assert deployment_lib.network_name(84532) == "base_sepolia"
 
 
-def test_network_name_falls_back_to_decimal_when_unmapped(script_dir):
-    write_networks(script_dir, {"8453": "base"})
+def test_network_name_falls_back_to_decimal_when_unmapped(config_dir):
+    write_networks(config_dir, {"8453": "base"})
     # A chain nobody has added an entry for still resolves, so deploying to a new
     # network needs no configuration.
     assert deployment_lib.network_name(31338) == "31338"
 
 
-def test_network_name_falls_back_when_map_is_absent(script_dir):
+def test_network_name_falls_back_when_map_is_absent(config_dir):
     assert deployment_lib.network_name(8453) == "8453"
 
 
-def test_deployment_path_is_derived_from_the_name(script_dir):
-    write_networks(script_dir, {"84532": "base_sepolia"})
+def test_deployment_path_is_derived_from_the_name(config_dir):
+    write_networks(config_dir, {"84532": "base_sepolia"})
     assert (
         deployment_lib.deployment_path(84532).name == "deployment.base_sepolia.json"
     )
@@ -76,10 +76,10 @@ def test_deployment_path_is_derived_from_the_name(script_dir):
 # --- load_deployment: happy path -------------------------------------------
 
 
-def test_load_returns_the_record_for_the_connected_chain(script_dir):
-    write_networks(script_dir, {"84532": "base_sepolia"})
+def test_load_returns_the_record_for_the_connected_chain(config_dir):
+    write_networks(config_dir, {"84532": "base_sepolia"})
     write_deployment(
-        script_dir,
+        config_dir,
         "base_sepolia",
         {"chainId": 84532, "registryProxy": "0xabc"},
     )
@@ -87,8 +87,8 @@ def test_load_returns_the_record_for_the_connected_chain(script_dir):
     assert record["registryProxy"] == "0xabc"
 
 
-def test_load_uses_the_numeric_filename_for_an_unmapped_chain(script_dir):
-    write_deployment(script_dir, "31338", {"chainId": 31338, "registryProxy": "0xdef"})
+def test_load_uses_the_numeric_filename_for_an_unmapped_chain(config_dir):
+    write_deployment(config_dir, "31338", {"chainId": 31338, "registryProxy": "0xdef"})
     record = deployment_lib.load_deployment(FakeWeb3(31338))
     assert record["registryProxy"] == "0xdef"
 
@@ -96,8 +96,8 @@ def test_load_uses_the_numeric_filename_for_an_unmapped_chain(script_dir):
 # --- load_deployment: the guard --------------------------------------------
 
 
-def test_load_raises_when_no_record_exists_for_the_chain(script_dir):
-    write_networks(script_dir, {"8453": "base"})
+def test_load_raises_when_no_record_exists_for_the_chain(config_dir):
+    write_networks(config_dir, {"8453": "base"})
     with pytest.raises(FileNotFoundError) as excinfo:
         deployment_lib.load_deployment(FakeWeb3(8453))
     # The message has to name the chain and the file, or the operator cannot tell
@@ -106,10 +106,10 @@ def test_load_raises_when_no_record_exists_for_the_chain(script_dir):
     assert "deployment.base.json" in str(excinfo.value)
 
 
-def test_load_rejects_a_record_from_a_different_chain(script_dir):
-    write_networks(script_dir, {"84532": "base_sepolia"})
+def test_load_rejects_a_record_from_a_different_chain(config_dir):
+    write_networks(config_dir, {"84532": "base_sepolia"})
     write_deployment(
-        script_dir,
+        config_dir,
         "base_sepolia",
         {"chainId": 8453, "registryProxy": "0xabc"},
     )
@@ -119,11 +119,11 @@ def test_load_rejects_a_record_from_a_different_chain(script_dir):
     assert "84532" in str(excinfo.value)
 
 
-def test_load_still_validates_a_quoted_chain_id(script_dir):
+def test_load_still_validates_a_quoted_chain_id(config_dir):
     """A hand-edited "8453" must be caught, not skipped as unparsable."""
-    write_networks(script_dir, {"84532": "base_sepolia"})
+    write_networks(config_dir, {"84532": "base_sepolia"})
     write_deployment(
-        script_dir,
+        config_dir,
         "base_sepolia",
         {"chainId": "8453", "registryProxy": "0xabc"},
     )
@@ -131,21 +131,21 @@ def test_load_still_validates_a_quoted_chain_id(script_dir):
         deployment_lib.load_deployment(FakeWeb3(84532))
 
 
-def test_load_accepts_a_matching_quoted_chain_id(script_dir):
-    write_networks(script_dir, {"84532": "base_sepolia"})
+def test_load_accepts_a_matching_quoted_chain_id(config_dir):
+    write_networks(config_dir, {"84532": "base_sepolia"})
     write_deployment(
-        script_dir,
+        config_dir,
         "base_sepolia",
         {"chainId": "84532", "registryProxy": "0xabc"},
     )
     assert deployment_lib.load_deployment(FakeWeb3(84532))["registryProxy"] == "0xabc"
 
 
-def test_load_raises_on_a_non_numeric_chain_id(script_dir):
+def test_load_raises_on_a_non_numeric_chain_id(config_dir):
     """Malformed must fail loudly — swallowing it disables the check silently."""
-    write_networks(script_dir, {"84532": "base_sepolia"})
+    write_networks(config_dir, {"84532": "base_sepolia"})
     write_deployment(
-        script_dir,
+        config_dir,
         "base_sepolia",
         {"chainId": "base_sepolia", "registryProxy": "0xabc"},
     )
@@ -153,10 +153,10 @@ def test_load_raises_on_a_non_numeric_chain_id(script_dir):
         deployment_lib.load_deployment(FakeWeb3(84532))
 
 
-def test_load_accepts_a_record_without_a_chain_id(script_dir):
+def test_load_accepts_a_record_without_a_chain_id(config_dir):
     """Files predating the field are read as-is rather than rejected."""
-    write_networks(script_dir, {"84532": "base_sepolia"})
-    write_deployment(script_dir, "base_sepolia", {"registryProxy": "0xabc"})
+    write_networks(config_dir, {"84532": "base_sepolia"})
+    write_deployment(config_dir, "base_sepolia", {"registryProxy": "0xabc"})
     assert deployment_lib.load_deployment(FakeWeb3(84532))["registryProxy"] == "0xabc"
 
 

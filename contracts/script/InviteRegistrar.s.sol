@@ -10,8 +10,8 @@ import {DeploymentLib} from "./DeploymentLib.sol";
 /// Env vars:
 ///   DEPLOYER_PRIVATE_KEY — deployer key
 ///
-/// `inviteSigner` comes from script/roles.<network>.json. Reads `registryProxy`
-/// from script/deployment.<network>.json.
+/// `inviteSigner` comes from script/config/roles.<network>.json. Reads `registryProxy`
+/// from script/config/deployment.<network>.json.
 contract InviteRegistrarScript is Script {
     InviteRegistrar public inviteRegistrar;
 

@@ -1,8 +1,8 @@
 """Per-network deployment loading, shared by the Python scripts.
 
-Mirrors DeploymentLib.sol: the record lives in `deployment.<network>.json`,
-where `<network>` comes from the connected chain id via `networks.json`, and an
-unmapped chain id falls back to its decimal form.
+Mirrors DeploymentLib.sol: the record lives in `config/deployment.<network>.json`,
+where `<network>` comes from the connected chain id via `config/networks.json`, and
+an unmapped chain id falls back to its decimal form.
 
 The file's own `chainId` field — not the filename — is what gets validated, so a
 renamed file or a numeric-fallback name cannot pair one network's addresses with
@@ -14,7 +14,10 @@ import json
 import os
 from pathlib import Path
 
-_SCRIPT_DIR = Path(__file__).parent
+# Per-network config lives in its own directory: these are the only files under
+# script/ whose count grows — two more per network — so they are kept apart from the
+# scripts, ABIs and tooling. Mirrors _configDir() in DeploymentLib.sol.
+_CONFIG_DIR = Path(__file__).parent / "config"
 
 # Env var holding the RPC endpoint. KITE_TEST_PRC_URL (sic) is the historical
 # name; it is still honoured so existing .env files keep working, but it names a
@@ -38,7 +41,7 @@ def rpc_url():
 def network_name(chain_id):
     """Readable name for a chain id, falling back to its decimal form."""
     key = str(chain_id)
-    path = _SCRIPT_DIR / "networks.json"
+    path = _CONFIG_DIR / "networks.json"
     if not path.exists():
         return key
     with path.open("r", encoding="utf-8") as file:
@@ -46,7 +49,7 @@ def network_name(chain_id):
 
 
 def deployment_path(chain_id):
-    return _SCRIPT_DIR / f"deployment.{network_name(chain_id)}.json"
+    return _CONFIG_DIR / f"deployment.{network_name(chain_id)}.json"
 
 
 def load_deployment(web3):

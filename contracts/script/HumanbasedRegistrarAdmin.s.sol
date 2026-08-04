@@ -8,13 +8,13 @@ import {DeploymentLib} from "./DeploymentLib.sol";
 /// @notice Rotate HumanbasedRegistrar's admin-controlled addresses.
 ///
 /// Both rotations are `onlyOwner` on the contract. The target address is read from
-/// script/deployment.<network>.json, so the chainId cross-check in DeploymentLib
+/// script/config/deployment.<network>.json, so the chainId cross-check in DeploymentLib
 /// applies — one network's registrar cannot be addressed over another network's RPC.
 ///
 /// Env vars:
 ///   DEPLOYER_PRIVATE_KEY — must be the contract's Ownable owner
 ///
-/// The target values come from script/roles.<network>.json, which makes that file the
+/// The target values come from script/config/roles.<network>.json, which makes that file the
 /// desired state and this script the thing that makes the chain converge to it. Edit the
 /// file, run the script, and the file stays equal to what is on chain. Taking the new
 /// address from the environment instead would let the file drift the moment anyone

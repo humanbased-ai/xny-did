@@ -48,12 +48,12 @@ scripts directly (see below) with the appropriate RPC URL and
 #### Deploy scripts
 
 Each script reads prior contract addresses from
-`script/deployment.<network>.json` and writes the new address back on
+`script/config/deployment.<network>.json` and writes the new address back on
 success. Run with
 `forge script script/<file>.s.sol:<Contract>Script --rpc-url <url> --broadcast`.
 
 `<network>` is derived from the chain id of whatever `--rpc-url` points at,
-using the map in `script/networks.json` (e.g. `84532` → `base_sepolia`). An
+using the map in `script/config/networks.json` (e.g. `84532` → `base_sepolia`). An
 unmapped chain id falls back to its decimal form
 (`deployment.31338.json`), so deploying to a new chain needs no
 configuration — add an entry to `networks.json` only if you want a readable
@@ -80,7 +80,7 @@ contract's admin / Ownable owner.
 
 #### Role addresses
 
-Role addresses live in `script/roles.<network>.json`, not in `.env`:
+Role addresses live in `script/config/roles.<network>.json`, not in `.env`:
 
 ```json
 {

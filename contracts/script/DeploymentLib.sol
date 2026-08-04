@@ -5,9 +5,9 @@ import {Vm} from "forge-std/Vm.sol";
 
 /// @dev Shared helpers for the per-network configuration files under `script/`.
 ///
-/// Two kinds, both named `<kind>.<network>.json`, with `<network>` derived from
-/// `block.chainid` via `script/networks.json` (unmapped ids fall back to the decimal
-/// form, so a new chain needs no configuration):
+/// Two kinds under `script/config/`, both named `<kind>.<network>.json`, with `<network>`
+/// derived from `block.chainid` via `script/config/networks.json` (unmapped ids fall back
+/// to the decimal form, so a new chain needs no configuration):
 ///
 ///   - `deployment.<network>.json` — output. Contract addresses, written by the deploy
 ///     scripts as they run, accumulating over successive deployments.
@@ -156,19 +156,27 @@ library DeploymentLib {
         return string.concat(acc, ",\n", line);
     }
 
-    /// @dev `script/<kind>.<network>.json`, e.g. _path(vm, "deployment") or _path(vm, "roles").
+    /// @dev `script/config/<kind>.<network>.json`, e.g. _path(vm, "deployment") or
+    ///      _path(vm, "roles").
     function _path(Vm vm, string memory kind) private view returns (string memory) {
-        return string.concat(vm.projectRoot(), "/script/", kind, ".", _networkName(vm), ".json");
+        return string.concat(_configDir(vm), kind, ".", _networkName(vm), ".json");
     }
 
-    /// @dev Maps the current chain id to a human-readable name via script/networks.json,
+    /// @dev The per-network config directory. These files are the only ones under script/
+    ///      whose count grows — two more per network — so they live together rather than
+    ///      alongside the scripts, ABIs and tooling.
+    function _configDir(Vm vm) private view returns (string memory) {
+        return string.concat(vm.projectRoot(), "/script/config/");
+    }
+
+    /// @dev Maps the current chain id to a human-readable name via script/config/networks.json,
     ///      falling back to the decimal chain id when the map is absent or has no entry.
     ///      A chain id that IS mapped but unreadable is a real error and propagates —
     ///      it must not degrade into the numeric filename, or a broken map would quietly
     ///      split one network's addresses across two files.
     function _networkName(Vm vm) private view returns (string memory) {
         string memory chainId = vm.toString(block.chainid);
-        string memory mapPath = string.concat(vm.projectRoot(), "/script/networks.json");
+        string memory mapPath = string.concat(_configDir(vm), "networks.json");
         if (!vm.exists(mapPath)) return chainId;
         string memory json = vm.readFile(mapPath);
         string memory key = string.concat("$['", chainId, "']");

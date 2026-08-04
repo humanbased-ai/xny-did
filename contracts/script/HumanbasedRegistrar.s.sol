@@ -15,8 +15,8 @@ import {DeploymentLib} from "./DeploymentLib.sol";
 /// Env vars:
 ///   DEPLOYER_PRIVATE_KEY — deployer key (becomes the admin / Ownable owner)
 ///
-/// `relayer` and `platformOwner` come from script/roles.<network>.json. Reads
-/// `registryProxy` from script/deployment.<network>.json and writes
+/// `relayer` and `platformOwner` come from script/config/roles.<network>.json. Reads
+/// `registryProxy` from script/config/deployment.<network>.json and writes
 /// `humanbasedRegistrar` back on success.
 contract HumanbasedRegistrarScript is Script {
     HumanbasedRegistrar public humanbasedRegistrar;
