@@ -11,7 +11,7 @@ import {DeploymentLib} from "./DeploymentLib.sol";
 /// Env vars:
 ///   DEPLOYER_PRIVATE_KEY — deployer key, pays gas
 ///
-/// The proxy owner comes from `owner` in script/roles.<network>.json. It is fixed at
+/// The proxy owner comes from `owner` in script/config/roles.<network>.json. It is fixed at
 /// initialize() and cannot be changed afterwards, so getting it wrong means redeploying —
 /// which is why it is read from a chainId-validated file rather than the environment.
 contract DIDRegistryScript is Script {
