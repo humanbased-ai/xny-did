@@ -19,15 +19,22 @@ class ResolveError extends Error {
   }
 }
 
+// ethers' FetchRequest defaults to a 5-minute timeout, long enough that a stalled
+// subgraph would tie up connections until the pod stops serving. Bound it to
+// something a probe interval can outlive.
+const DEFAULT_TIMEOUT_MS = 10000;
+
 class Resolver {
   /**
    * Constructor
    * @param {string} graphUrl - The Graph API URL
    * @param {string} accessToken - The Authorization token
+   * @param {number} [timeoutMs] - Upstream request timeout, ms
    */
-  constructor(graphUrl, accessToken) {
+  constructor(graphUrl, accessToken, timeoutMs) {
     this.graphUrl = graphUrl;
     this.accessToken = accessToken;
+    this.timeoutMs = timeoutMs || DEFAULT_TIMEOUT_MS;
   }
 
   /**
@@ -48,6 +55,7 @@ class Resolver {
 
       const req = new ethers.FetchRequest(this.graphUrl);
       req.method = 'POST';
+      req.timeout = this.timeoutMs;
       req.setHeader('Content-Type', 'application/json');
       req.setHeader('Authorization', this.accessToken);
       req.body = {
@@ -135,9 +143,13 @@ class Resolver {
   }
 }
 
+// config.get() throws on a missing key, which is the behaviour we want here: a pod
+// with no upstream configured should fail to start rather than come up healthy and
+// return errors for every resolution.
 const ResolverInstance = new Resolver(
-  config.get('GRAPH_URL'),
-  config.get('GRAPH_ACCESS_TOKEN')
+  config.get('RESOLVER_GRAPH_URL'),
+  config.get('RESOLVER_GRAPH_ACCESS_TOKEN'),
+  Number(process.env.RESOLVER_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS
 );
 
 module.exports = ResolverInstance;

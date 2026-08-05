@@ -1,4 +1,4 @@
 {
-  "GRAPH_URL": "https://api.studio.thegraph.com/query/1757359/did-base/version/latest",
-  "GRAPH_ACCESS_TOKEN": "YOUR_GRAPH_ACCESS_TOKEN"
+  "RESOLVER_GRAPH_URL": "https://api.studio.thegraph.com/query/1757359/did-base/version/latest",
+  "RESOLVER_GRAPH_ACCESS_TOKEN": "YOUR_GRAPH_ACCESS_TOKEN"
 }
