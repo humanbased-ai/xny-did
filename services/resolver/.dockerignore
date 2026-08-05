@@ -1,0 +1,20 @@
+# Docker reads this only at the build context root. The context is this directory
+# (`docker build -f docker/Dockerfile .` from services/resolver), so the file has to
+# live here rather than beside the Dockerfile in docker/, where Docker would ignore
+# it without saying so.
+#
+# The Dockerfile copies explicit paths instead of `COPY . .`, so nothing below is
+# load-bearing on its own. This is the second line of defence, and it keeps the
+# daemon from being handed a few hundred megabytes of node_modules on every build.
+
+# Holds RESOLVER_GRAPH_ACCESS_TOKEN on a developer machine. Must never reach a layer
+# that gets pushed to Artifact Registry.
+config/default.json
+
+# Installed on the host, and on an arm64 laptop the wrong architecture outright.
+node_modules
+
+tests
+docker
+*.md
+*.log
