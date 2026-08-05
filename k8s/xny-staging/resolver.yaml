@@ -1,0 +1,121 @@
+# did:xny resolver — xny-staging on humanbased-cluster (asia-southeast1, Autopilot).
+#
+# Applied by .github/workflows/deploy-resolver.yml, which rewrites the image
+# reference to the digest it just pushed. Applying this file by hand leaves the
+# placeholder below in place, which will not pull.
+#
+# The manifests for the other services in this namespace live in
+# humanbased-ai/xny-monorepo. That pipeline applies without --prune, so the two
+# sets coexist without either removing the other's resources.
+#
+# No Ingress on purpose: nothing outside the cluster consumes the resolver yet,
+# and the DIF Universal Resolver runs our image on its own machines rather than
+# calling a URL of ours. Adding one later needs only an Ingress and a
+# ManagedCertificate — nothing below has to change.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: did-resolver
+  namespace: xny-staging
+  labels:
+    app: did-resolver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: did-resolver
+  template:
+    metadata:
+      labels:
+        app: did-resolver
+      annotations:
+        # Re-deploying an identical image digest would otherwise produce no new
+        # ReplicaSet and no rollout at all. The workflow stamps this with
+        # <run_id>-<run_attempt>, matching the convention the rest of the
+        # namespace uses.
+        xny.codatta.io/rollout-id: PLACEHOLDER_ROLLOUT_ID
+    spec:
+      # Autopilot mixes architectures; every existing pod in this namespace
+      # carries this toleration, and the image is built linux/amd64 only.
+      tolerations:
+        - key: kubernetes.io/arch
+          operator: Equal
+          value: amd64
+          effect: NoSchedule
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      # Covers the 5s drain plus the 10s upstream timeout with room to spare;
+      # see the shutdown comment in services/resolver/index.js.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: did-resolver
+          image: PLACEHOLDER_IMAGE
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          # RESOLVER_GRAPH_URL comes from here. config.get() throws on a missing
+          # key, so a namespace without it fails the pod on boot rather than
+          # letting it serve errors.
+          envFrom:
+            - configMapRef:
+                name: xny-common
+          env:
+            - name: RESOLVER_GRAPH_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: xny-secrets
+                  key: RESOLVER_GRAPH_ACCESS_TOKEN
+          # /health never calls the subgraph: an upstream outage must not
+          # restart-loop the pods on top of it.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 60
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 1
+          # Returns 503 once SIGTERM starts the drain, which is what takes the
+          # pod out of rotation before the server stops accepting.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            capabilities:
+              drop:
+                - NET_RAW
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: did-resolver
+  namespace: xny-staging
+  labels:
+    app: did-resolver
+spec:
+  type: ClusterIP
+  selector:
+    app: did-resolver
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP

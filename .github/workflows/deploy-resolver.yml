@@ -1,0 +1,127 @@
+name: Deploy resolver
+
+# Only the resolver's own files trigger this. The contracts live in the same repo
+# and change far more often; without the path filter every Solidity commit would
+# push an identical image and roll the pods.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/resolver/**'
+      - 'k8s/xny-staging/resolver.yaml'
+      - '.github/workflows/deploy-resolver.yml'
+  workflow_dispatch:
+
+# Authentication is Workload Identity Federation, so no service-account key is
+# stored anywhere: id-token lets the runner mint an OIDC token that GCP trades
+# for short-lived credentials.
+permissions:
+  contents: read
+  id-token: write
+
+# One deploy at a time. Two overlapping runs would race on which digest the
+# Deployment ends up pointing at.
+concurrency:
+  group: deploy-resolver
+  cancel-in-progress: false
+
+env:
+  PROJECT_ID: humanbased-ai
+  REGION: asia-southeast1
+  CLUSTER: humanbased-cluster
+  NAMESPACE: xny-staging
+  IMAGE: asia-southeast1-docker.pkg.dev/humanbased-ai/humanbased/xny-did-resolver
+
+jobs:
+  # The repo-wide CI workflow covers the Foundry project and the Python scripts
+  # only, so without this the resolver's own suite would never gate a deploy.
+  test:
+    name: Resolver tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/resolver
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: services/resolver/package-lock.json
+
+      # `ci`, not `install`, for the same reason the image uses it: install
+      # exactly the lockfile, and fail if package.json has drifted from it.
+      - run: npm ci
+
+      - run: node --test
+
+  deploy:
+    name: Build, push and roll out
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+          # Needed to log docker into Artifact Registry below.
+          token_format: access_token
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Matches the tag shape the rest of the namespace uses. The tag is for
+      # humans reading the registry; the rollout below pins the digest.
+      - id: meta
+        run: echo "tag=staging-$(date -u +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          # The service root, not the repo root: .dockerignore only applies at
+          # the context root, and the Dockerfile's COPY paths are relative to it.
+          context: services/resolver
+          file: services/resolver/docker/Dockerfile
+          # Cluster nodes are amd64. A multi-arch build would only add minutes.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.CLUSTER }}
+          location: ${{ env.REGION }}
+
+      # Pin the digest rather than the tag: a tag can be moved, and Deployments
+      # that track one can silently pull something else on the next restart.
+      #
+      # rollout-id makes re-running this workflow on an unchanged digest still
+      # produce a new ReplicaSet, so a manual re-deploy actually rolls the pods
+      # instead of doing nothing.
+      - name: Apply
+        run: |
+          sed -e "s|PLACEHOLDER_IMAGE|${IMAGE}@${DIGEST}|" \
+              -e "s|PLACEHOLDER_ROLLOUT_ID|${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}|" \
+              k8s/xny-staging/resolver.yaml | kubectl apply -f -
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+
+      # Fails the job if the new pods never become ready, so a broken deploy
+      # shows up here instead of as a red pod nobody is looking at.
+      - name: Wait for rollout
+        run: kubectl -n "$NAMESPACE" rollout status deployment/did-resolver --timeout=5m
+
+      - name: Report
+        if: always()
+        run: kubectl -n "$NAMESPACE" get deploy,pod -l app=did-resolver
