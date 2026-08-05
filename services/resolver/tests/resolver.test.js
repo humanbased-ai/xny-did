@@ -1,10 +1,13 @@
 'use strict';
 
 // resolver.js builds a config-backed singleton at module load (config.get throws if
-// GRAPH_URL / GRAPH_ACCESS_TOKEN are unset). Provide dummies before requiring it so the
-// suite is self-contained on a clean checkout; tests use their own mock-server instances.
-process.env.GRAPH_URL = process.env.GRAPH_URL || 'http://unused.local';
-process.env.GRAPH_ACCESS_TOKEN = process.env.GRAPH_ACCESS_TOKEN || 'test';
+// RESOLVER_GRAPH_URL / RESOLVER_GRAPH_ACCESS_TOKEN are unset). Provide dummies before
+// requiring it so the suite is self-contained on a clean checkout; tests use their own
+// mock-server instances.
+process.env.RESOLVER_GRAPH_URL =
+  process.env.RESOLVER_GRAPH_URL || 'http://unused.local';
+process.env.RESOLVER_GRAPH_ACCESS_TOKEN =
+  process.env.RESOLVER_GRAPH_ACCESS_TOKEN || 'test';
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
@@ -260,6 +263,115 @@ test('controller: resolution profile Accept -> 200 wrapped Resolution Result', a
   const parsed = JSON.parse(res.body);
   assert.equal(parsed['@context'], 'https://w3id.org/did-resolution/v1');
   assert.deepEqual(parsed.didDocument, doc);
+});
+
+// --- Upstream timeout ---
+
+test('hung upstream -> rejects within the configured timeout', async () => {
+  // Accepts the request and never answers, which is what a stalled subgraph looks
+  // like from here. Without FetchRequest.timeout this would hang for ethers'
+  // 5-minute default.
+  const hung = http.createServer(() => {});
+  await new Promise((resolve) => hung.listen(0, '127.0.0.1', resolve));
+
+  const slow = new Resolver(
+    `http://127.0.0.1:${hung.address().port}`,
+    'token',
+    150
+  );
+
+  try {
+    const startedAt = process.hrtime.bigint();
+    await assert.rejects(
+      () => slow.resolve(FOUND),
+      (e) => e.status === 500 && e.code === 'internalError'
+    );
+    const elapsedMs = Number(process.hrtime.bigint() - startedAt) / 1e6;
+
+    // Generous ceiling: the point is that it gave up on its own, not that it hit
+    // the deadline to the millisecond.
+    assert.ok(
+      elapsedMs < 5000,
+      `expected the timeout to fire, took ${elapsedMs.toFixed(0)}ms`
+    );
+  } finally {
+    // The abandoned request leaves a socket open, and close() alone waits for
+    // every connection to end — which this server never does. Drop them first or
+    // the test process hangs at exit instead of failing.
+    hung.closeAllConnections();
+    hung.close();
+  }
+});
+
+test('timeout defaults when not supplied', () => {
+  const r = new Resolver('http://unused.local', 'token');
+  assert.equal(r.timeoutMs, 10000);
+});
+
+// --- Probe routes ---
+
+// Boots the real express app on an ephemeral port so the probes are exercised
+// through HTTP rather than by calling handlers directly.
+async function withApp(fn) {
+  const { createApp } = require('../app');
+  const { app, state } = createApp();
+  const srv = http.createServer(app);
+  await new Promise((resolve) => srv.listen(0, '127.0.0.1', resolve));
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    await fn({ base, state });
+  } finally {
+    // node's fetch keeps its sockets alive, so close() would wait on connections
+    // that never end on their own and stall process exit.
+    srv.closeAllConnections();
+    srv.close();
+  }
+}
+
+test('GET /health -> 200 without touching the subgraph', async () => {
+  await withApp(async ({ base }) => {
+    // Any upstream call would have to go through this; a hit means /health is
+    // reaching for the subgraph, which would let an outage restart-loop the pod.
+    let upstreamCalls = 0;
+    global.Resolver = {
+      resolve: async () => {
+        upstreamCalls += 1;
+        return {};
+      },
+    };
+
+    const res = await fetch(`${base}/health`);
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { status: 'ok' });
+    assert.equal(upstreamCalls, 0);
+  });
+});
+
+test('GET /ready -> 200 while serving', async () => {
+  await withApp(async ({ base }) => {
+    const res = await fetch(`${base}/ready`);
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { status: 'ready' });
+  });
+});
+
+test('GET /ready -> 503 once shutdown begins', async () => {
+  await withApp(async ({ base, state }) => {
+    state.shuttingDown = true;
+    const res = await fetch(`${base}/ready`);
+    // The load balancer pulls the pod from rotation off this status; a 200 here
+    // would keep traffic arriving through the drain window.
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { status: 'shutting down' });
+  });
+});
+
+test('GET /health stays 200 during shutdown (liveness must not restart a draining pod)', async () => {
+  await withApp(async ({ base, state }) => {
+    state.shuttingDown = true;
+    const res = await fetch(`${base}/health`);
+    assert.equal(res.status, 200);
+  });
 });
 
 test('controller: error path stays application/json Resolution Result', async () => {
