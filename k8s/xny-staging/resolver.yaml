@@ -8,10 +8,10 @@
 # humanbased-ai/xny-monorepo. That pipeline applies without --prune, so the two
 # sets coexist without either removing the other's resources.
 #
-# No Ingress on purpose: nothing outside the cluster consumes the resolver yet,
-# and the DIF Universal Resolver runs our image on its own machines rather than
-# calling a URL of ours. Adding one later needs only an Ingress and a
-# ManagedCertificate — nothing below has to change.
+# Served publicly at https://did.staging.xnyscan.com via the Ingress at the
+# bottom of this file. Note that the DIF Universal Resolver does not consume that
+# URL — it runs our image on its own machines — so the endpoint exists for our own
+# callers, and is unauthenticated, uncached and unthrottled.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -111,6 +111,13 @@ metadata:
   namespace: xny-staging
   labels:
     app: did-resolver
+  annotations:
+    # The Ingress load balancer routes to pod IPs through a network endpoint
+    # group rather than hopping via kube-proxy. GKE adds this by itself on a
+    # VPC-native cluster, and did so for this Service already — stated here so
+    # the manifest declares what it depends on instead of inheriting a default
+    # that a future cluster might not share.
+    cloud.google.com/neg: '{"ingress": true}'
 spec:
   type: ClusterIP
   selector:
@@ -119,3 +126,51 @@ spec:
     - port: 8080
       targetPort: 8080
       protocol: TCP
+---
+# Google-managed certificate. It stays in Provisioning (often reported as
+# FailedNotVisible) until did.staging.xnyscan.com resolves to the load balancer
+# the Ingress below creates — which cannot happen before that Ingress exists. So
+# the first apply is expected to leave this pending; it goes Active 15-60 minutes
+# after the DNS record is added, and renews itself from then on.
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: did-resolver-cert
+  namespace: xny-staging
+spec:
+  domains:
+    - did.staging.xnyscan.com
+---
+# Provisions an external HTTP(S) load balancer. Its backend health check is
+# derived from the pod's readinessProbe, i.e. /ready — which is why that endpoint
+# reports local serving capability only. Were it to probe the subgraph, one
+# upstream blip would fail every replica at once and the load balancer would
+# answer 502 for the whole service instead of the resolver returning an error for
+# the one request that hit the problem.
+#
+# GKE reserves the LB's address automatically, named after the forwarding rule,
+# so no global-static-ip-name annotation is needed. The address is released only
+# if this Ingress is deleted.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: did-resolver
+  namespace: xny-staging
+  annotations:
+    networking.gke.io/managed-certificates: did-resolver-cert
+spec:
+  ingressClassName: gce
+  rules:
+    - host: did.staging.xnyscan.com
+      http:
+        paths:
+          # `/*` with ImplementationSpecific is what the GCE ingress controller
+          # expects for a catch-all; Prefix `/` maps to a different URL-map rule
+          # shape. Matches the lineage-explorer Ingress already working here.
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: did-resolver
+                port:
+                  number: 8080
