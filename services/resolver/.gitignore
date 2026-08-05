@@ -9,4 +9,3 @@ output/
 /.idea/
 *.iml
 config/default.json
-package-lock.json
