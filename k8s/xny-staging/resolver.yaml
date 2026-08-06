@@ -157,9 +157,20 @@ metadata:
   name: did-resolver
   namespace: xny-staging
   annotations:
+    # The class has to be declared as an annotation, not spec.ingressClassName.
+    # That field names an IngressClass object, and this cluster has none at all
+    # (`kubectl get ingressclass` returns nothing), so the GCE ingress controller
+    # does not recognise the Ingress as its own and skips it — with no error, no
+    # event, and no address, indefinitely. The first attempt at this sat inert for
+    # over two hours that way, while the ManagedCertificate controller went ahead
+    # and stamped pre-shared-cert on it, which made it look like progress.
+    #
+    # lineage-explorer's live object carries this same annotation with
+    # spec.ingressClassName empty, even though its stored manifest says otherwise;
+    # it was converted when it was created and ours was not.
+    kubernetes.io/ingress.class: gce
     networking.gke.io/managed-certificates: did-resolver-cert
 spec:
-  ingressClassName: gce
   rules:
     - host: did.staging.xnyscan.com
       http:
