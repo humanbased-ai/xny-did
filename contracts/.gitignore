@@ -10,9 +10,18 @@ out/
 # Docs
 docs/
 
-# Dotenv file
+# Dotenv files. The `.*` variants matter as much as the bare names: per-network
+# files like script/.env.base_sepolia are a natural thing to create, they hold
+# the same private keys, and neither `.env` nor `script/.env` matches them — so
+# without these they sit untracked and one `git add .` away from being published.
 .env
+.env.*
 script/.env
+script/.env.*
+# ...except the committed template, which the patterns above would otherwise
+# swallow. It is already tracked so nothing breaks today, but re-adding it after
+# a delete would silently do nothing.
+!script/.env.example
 did
 
 broadcast/
