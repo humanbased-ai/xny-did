@@ -3,6 +3,10 @@ name: Deploy resolver
 # Only the resolver's own files trigger this. The contracts live in the same repo
 # and change far more often; without the path filter every Solidity commit would
 # push an identical image and roll the pods.
+#
+# A push only ever rolls staging — note that k8s/xny-production/resolver.yaml is
+# deliberately absent from the paths below. Production is reached exclusively by
+# dispatching this workflow by hand and picking that namespace.
 on:
   push:
     branches: [main]
@@ -11,6 +15,14 @@ on:
       - 'k8s/xny-staging/resolver.yaml'
       - '.github/workflows/deploy-resolver.yml'
   workflow_dispatch:
+    inputs:
+      namespace:
+        description: Namespace to deploy to
+        type: choice
+        default: xny-staging
+        options:
+          - xny-staging
+          - xny-production
 
 # Authentication is Workload Identity Federation, so no service-account key is
 # stored anywhere: id-token lets the runner mint an OIDC token that GCP trades
@@ -19,17 +31,21 @@ permissions:
   contents: read
   id-token: write
 
-# One deploy at a time. Two overlapping runs would race on which digest the
-# Deployment ends up pointing at.
+# One deploy at a time per namespace. Two overlapping runs would race on which
+# digest the Deployment ends up pointing at — but a staging run has no reason to
+# hold up a production one, so the namespace is part of the group.
 concurrency:
-  group: deploy-resolver
+  group: deploy-resolver-${{ inputs.namespace || 'xny-staging' }}
   cancel-in-progress: false
 
 env:
   PROJECT_ID: humanbased-ai
   REGION: asia-southeast1
   CLUSTER: humanbased-cluster
-  NAMESPACE: xny-staging
+  # On a push there is no inputs context to read, and a push means staging.
+  # Everything downstream — the manifest path, the image tag prefix, the rollout
+  # check — derives from this one value.
+  NAMESPACE: ${{ inputs.namespace || 'xny-staging' }}
   IMAGE: asia-southeast1-docker.pkg.dev/humanbased-ai/humanbased/xny-did-resolver
 
 jobs:
@@ -79,10 +95,11 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
-      # Matches the tag shape the rest of the namespace uses. The tag is for
+      # Matches the tag shape the rest of the namespace uses: the namespace
+      # without its xny- prefix, so staging- and production-. The tag is for
       # humans reading the registry; the rollout below pins the digest.
       - id: meta
-        run: echo "tag=staging-$(date -u +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+        run: echo "tag=${NAMESPACE#xny-}-$(date -u +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - id: build
         uses: docker/build-push-action@v6
@@ -113,7 +130,7 @@ jobs:
         run: |
           sed -e "s|PLACEHOLDER_IMAGE|${IMAGE}@${DIGEST}|" \
               -e "s|PLACEHOLDER_ROLLOUT_ID|${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}|" \
-              k8s/xny-staging/resolver.yaml | kubectl apply -f -
+              "k8s/${NAMESPACE}/resolver.yaml" | kubectl apply -f -
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
 
