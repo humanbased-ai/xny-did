@@ -1,0 +1,191 @@
+# did:xny resolver — xny-production on humanbased-cluster (asia-southeast1, Autopilot).
+#
+# The staging copy of this file is k8s/xny-staging/resolver.yaml. The two differ
+# in namespace, hostname and replica count only; anything else that diverges is
+# a mistake unless a comment here says why.
+#
+# Applied by .github/workflows/deploy-resolver.yml, which rewrites the image
+# reference to the digest it just pushed. Applying this file by hand leaves the
+# placeholder below in place, which will not pull. Unlike staging, production is
+# never rolled by a push to main — the workflow only targets this namespace when
+# it is dispatched manually.
+#
+# The manifests for the other services in this namespace live in
+# humanbased-ai/xny-monorepo. That pipeline applies without --prune, so the two
+# sets coexist without either removing the other's resources.
+#
+# Served publicly at https://did.xnyscan.com via the Ingress at the bottom of
+# this file. Note that the DIF Universal Resolver does not consume that URL — it
+# runs our image on its own machines — so the endpoint exists for our own
+# callers, and is unauthenticated, uncached and unthrottled.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: did-resolver
+  namespace: xny-production
+  labels:
+    app: did-resolver
+spec:
+  # Two, unlike staging: with one replica every rollout and every node drain is
+  # a gap in service, and this one answers public traffic.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: did-resolver
+  template:
+    metadata:
+      labels:
+        app: did-resolver
+      annotations:
+        # Re-deploying an identical image digest would otherwise produce no new
+        # ReplicaSet and no rollout at all. The workflow stamps this with
+        # <run_id>-<run_attempt>, matching the convention the rest of the
+        # namespace uses.
+        xny.codatta.io/rollout-id: PLACEHOLDER_ROLLOUT_ID
+    spec:
+      # Autopilot mixes architectures; every existing pod in this namespace
+      # carries this toleration, and the image is built linux/amd64 only.
+      tolerations:
+        - key: kubernetes.io/arch
+          operator: Equal
+          value: amd64
+          effect: NoSchedule
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      # Covers the 5s drain plus the 10s upstream timeout with room to spare;
+      # see the shutdown comment in services/resolver/index.js.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: did-resolver
+          image: PLACEHOLDER_IMAGE
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          # RESOLVER_GRAPH_URL comes from here, and must point at the Base
+          # mainnet subgraph in this namespace. config.get() throws on a missing
+          # key, so a namespace without it fails the pod on boot rather than
+          # letting it serve errors.
+          envFrom:
+            - configMapRef:
+                name: xny-common
+          env:
+            - name: RESOLVER_GRAPH_ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: xny-secrets
+                  key: RESOLVER_GRAPH_ACCESS_TOKEN
+          # /health never calls the subgraph: an upstream outage must not
+          # restart-loop the pods on top of it.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 60
+            timeoutSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+            timeoutSeconds: 1
+          # Returns 503 once SIGTERM starts the drain, which is what takes the
+          # pod out of rotation before the server stops accepting.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            periodSeconds: 5
+            failureThreshold: 3
+            timeoutSeconds: 1
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            capabilities:
+              drop:
+                - NET_RAW
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: did-resolver
+  namespace: xny-production
+  labels:
+    app: did-resolver
+  annotations:
+    # The Ingress load balancer routes to pod IPs through a network endpoint
+    # group rather than hopping via kube-proxy. GKE adds this by itself on a
+    # VPC-native cluster — stated here so the manifest declares what it depends
+    # on instead of inheriting a default that a future cluster might not share.
+    cloud.google.com/neg: '{"ingress": true}'
+spec:
+  type: ClusterIP
+  selector:
+    app: did-resolver
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+---
+# Google-managed certificate. It stays in Provisioning (often reported as
+# FailedNotVisible) until did.xnyscan.com resolves to the load balancer the
+# Ingress below creates — which cannot happen before that Ingress exists. So the
+# first apply is expected to leave this pending; it goes Active 15-60 minutes
+# after the DNS record is added, and renews itself from then on.
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: did-resolver-cert
+  namespace: xny-production
+spec:
+  domains:
+    - did.xnyscan.com
+---
+# Provisions an external HTTP(S) load balancer. Its backend health check is
+# derived from the pod's readinessProbe, i.e. /ready — which is why that endpoint
+# reports local serving capability only. Were it to probe the subgraph, one
+# upstream blip would fail every replica at once and the load balancer would
+# answer 502 for the whole service instead of the resolver returning an error for
+# the one request that hit the problem.
+#
+# GKE reserves the LB's address automatically, named after the forwarding rule,
+# so no global-static-ip-name annotation is needed. The address is released only
+# if this Ingress is deleted.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: did-resolver
+  namespace: xny-production
+  annotations:
+    # The class has to be declared as an annotation, not spec.ingressClassName.
+    # That field names an IngressClass object, and this cluster has none at all
+    # (`kubectl get ingressclass` returns nothing), so the GCE ingress controller
+    # does not recognise the Ingress as its own and skips it — with no error, no
+    # event, and no address, indefinitely. Staging sat inert for over two hours
+    # that way, while the ManagedCertificate controller went ahead and stamped
+    # pre-shared-cert on it, which made it look like progress.
+    kubernetes.io/ingress.class: gce
+    networking.gke.io/managed-certificates: did-resolver-cert
+spec:
+  rules:
+    - host: did.xnyscan.com
+      http:
+        paths:
+          # `/*` with ImplementationSpecific is what the GCE ingress controller
+          # expects for a catch-all; Prefix `/` maps to a different URL-map rule
+          # shape.
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: did-resolver
+                port:
+                  number: 8080
