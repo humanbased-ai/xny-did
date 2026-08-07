@@ -79,6 +79,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # A dispatch chooses its own ref, so without this anyone could pick a
+      # feature branch, pick xny-production, and put unreviewed code on the
+      # public endpoint with that branch's own tests as the only gate. Staging is
+      # deliberately left open: deploying a branch there is the point of it.
+      #
+      # A failing step rather than a job-level `if:`, because a skipped job
+      # reports the run as green and a refused production deploy should not look
+      # like a successful one.
+      #
+      # The manifest check is belt and braces: kubectl writes to the namespace
+      # baked into each document, not to $NAMESPACE, so a file whose contents
+      # disagreed with its directory would apply somewhere the rollout check
+      # below is not watching, and pass green having rolled nothing.
+      - name: Guard the target
+        run: |
+          if [ "$NAMESPACE" = xny-production ] && [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::xny-production can only be deployed from main; this ref is $GITHUB_REF"
+            exit 1
+          fi
+          manifest="k8s/${NAMESPACE}/resolver.yaml"
+          test -f "$manifest" || { echo "::error::no manifest at $manifest"; exit 1; }
+          grep -q "namespace: ${NAMESPACE}$" "$manifest" || {
+            echo "::error::$manifest does not declare namespace ${NAMESPACE}"; exit 1; }
+
       - id: auth
         uses: google-github-actions/auth@v2
         with:
@@ -136,8 +160,16 @@ jobs:
 
       # Fails the job if the new pods never become ready, so a broken deploy
       # shows up here instead of as a red pod nobody is looking at.
+      #
+      # Longer than the Deployment's 600s progressDeadlineSeconds on purpose:
+      # Kubernetes decides when a rollout has stalled, and this waits long enough
+      # to hear that verdict rather than pre-empting it. At the 5m this used to
+      # be, a two-replica rollout that needed a cold Autopilot node — sequential,
+      # since maxUnavailable computes to 0 — went red while it was still
+      # progressing, and a re-run would have stacked a second rollout on the
+      # first.
       - name: Wait for rollout
-        run: kubectl -n "$NAMESPACE" rollout status deployment/did-resolver --timeout=5m
+        run: kubectl -n "$NAMESPACE" rollout status deployment/did-resolver --timeout=11m
 
       - name: Report
         if: always()
