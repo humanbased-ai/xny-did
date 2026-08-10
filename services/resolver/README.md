@@ -109,11 +109,16 @@ per release.
 
 ### Cutting a release
 
-1. Bump `version` in `services/resolver/package.json` and merge it
-2. Tag that commit `resolver-v<version>` and push the tag
+1. Bump `version` in `services/resolver/package.json` to an `x.y.z` version and merge it
+2. Tag the resulting commit **on `main`** as `resolver-v<version>`, and push the tag
 
-`publish-resolver-image.yml` runs the test suite, then builds and publishes. It refuses
-a tag that is not on main, and one whose version disagrees with `package.json`.
+`publish-resolver-image.yml` runs the test suite, then builds and publishes. It refuses a
+tag whose commit was never `main`'s own tip, one whose version is not `x.y.z`, one whose
+version disagrees with `package.json`, and one whose version has already been published —
+git tags are mutable, published images should not be.
+
+Tag `main` itself, not the branch commit the bump was authored on. Those are different
+commits, and only the first is what CI ran against.
 
 The `resolver-v` prefix is load-bearing: the repo's plain `v1.0.0` / `v1.0.1` / `v1.0.2`
 tags version the method specification in `docs/xny-did-method.md`, and the W3C DID method
