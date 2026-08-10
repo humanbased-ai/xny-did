@@ -88,3 +88,38 @@ curl -X GET http://localhost:8080/1.0/identifiers/did:xny:95228308-9d75-4dd8-895
 ```
 npm start
 ```
+
+## Public image
+
+Released images are published to `ghcr.io/humanbased-ai/xny-did-resolver`, tagged with
+the version and never with `latest` — the DIF driver docs require a Universal Resolver
+entry to pin a version. Both `linux/amd64` and `linux/arm64` are built.
+
+```
+docker run -p 8080:8080 ghcr.io/humanbased-ai/xny-did-resolver:1.0.0
+curl http://localhost:8080/1.0/identifiers/did:xny:e44c542d-ae34-ff1a-ccad-6202fa680ebd
+```
+
+No environment is needed: the image defaults to the rpc backend, which reads Base
+mainnet over a public endpoint.
+
+This is a different image from the one the cluster runs. `deploy-resolver.yml` pushes
+to a private Artifact Registry on every merge to roll staging; the public image is cut
+per release.
+
+### Cutting a release
+
+1. Bump `version` in `services/resolver/package.json` and merge it
+2. Tag that commit `resolver-v<version>` and push the tag
+
+`publish-resolver-image.yml` runs the test suite, then builds and publishes. It refuses
+a tag that is not on main, and one whose version disagrees with `package.json`.
+
+The `resolver-v` prefix is load-bearing: the repo's plain `v1.0.0` / `v1.0.1` / `v1.0.2`
+tags version the method specification in `docs/xny-did-method.md`, and the W3C DID method
+registry links into one of them.
+
+> **First release only.** A GHCR package is private by default even under a public
+> repository. After the first publish, set the package to public in its settings —
+> until then an anonymous `docker pull` fails with a 404, which reads like a missing
+> image rather than a permissions problem.
