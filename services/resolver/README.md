@@ -18,7 +18,10 @@ did:xny:95228308-9d75-4dd8-8958-2713b92d3d71
 ## Backends
 
 Resolution reads from one of two backends, selected by `RESOLVER_BACKEND`. Both produce
-the same DID Document for the same DID.
+the same DID Document for the same DID, provided the subgraph indexes the same registry
+contract on the same chain that the rpc backend is pointed at — the checked-in
+`services/indexer/subgraph.yaml` targets Base Sepolia, so a local subgraph built from it
+and the Base mainnet rpc defaults would disagree simply by reading two different chains.
 
 | `RESOLVER_BACKEND` | Reads | Needs a secret |
 | ------------------ | ----- | -------------- |
@@ -39,6 +42,13 @@ the self-hosted instances use.
 | `RESOLVER_GRAPH_URL` | subgraph | none, required |
 | `RESOLVER_GRAPH_ACCESS_TOKEN` | subgraph | none, required |
 | `RESOLVER_TIMEOUT_MS` | both | `10000` |
+
+One difference between the backends is not reconcilable: after a controller has been
+revoked, the entries of `controller` past the first may come back in a different order.
+The registry stores controllers in an `EnumerableSet`, whose removal swaps the last
+element into the freed slot, while the subgraph preserves insertion order. The set is the
+same either way, and DID Core treats `controller` as a set, but a consumer that hashes or
+diffs the serialized document should not assume a stable order.
 
 Base mainnet is the authoritative deployment for `did:xny` resolution
 (`docs/xny-did-method.md`), so the rpc defaults point at it. Pointing the resolver at a

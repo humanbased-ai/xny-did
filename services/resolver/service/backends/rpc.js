@@ -57,6 +57,27 @@ function parseJsonObject(hexValue) {
     : null;
 }
 
+// addSingleMethod (arrayAttributeHandler.ts:82-118) refuses to create an entity unless
+// type is a string AND, when controller is present, it is either an integral number or a
+// string. An explicit null, a float, a bool or an array all abort it, so the subgraph has
+// no entity for that item at all and neither may we. Shared by verificationMethod and the
+// five relations, which both route through addSingleMethod upstream.
+function isStorableMethod(parsed) {
+  if (!parsed || typeof parsed.type !== 'string') {
+    return false;
+  }
+  if (!('controller' in parsed)) {
+    return true;
+  }
+  const controller = parsed.controller;
+  return (
+    (typeof controller === 'number' && Number.isInteger(controller)) ||
+    // A non-numeric string reaches BigInt.fromString upstream, which does not return a
+    // value the handler can use; treating it as dropped is the closest match.
+    (typeof controller === 'string' && /^[0-9]+$/.test(controller))
+  );
+}
+
 function findAttribute(arrayAttributes, name) {
   const attribute = arrayAttributes.find((a) => a.name === name);
   return attribute ? attribute.values : [];
@@ -87,9 +108,7 @@ function toDidDocumentShape(did, owner, controller, arrayAttributes) {
       return;
     }
     const parsed = parseJsonObject(item.value);
-    // addSingleMethod bails without creating an entity when type is missing or not a
-    // string (arrayAttributeHandler.ts:82-93).
-    if (!parsed || typeof parsed.type !== 'string') {
+    if (!isStorableMethod(parsed)) {
       return;
     }
     const id = `${did}#vm_${index}`;
@@ -130,8 +149,9 @@ function toDidDocumentShape(did, owner, controller, arrayAttributes) {
       const parsed = parseJsonObject(item.value);
       if (parsed) {
         // An object value becomes an embedded SingleMethod, and the entity's uri stays
-        // null (arrayAttributeHandler.ts:206). Same bail-out as verificationMethod.
-        if (typeof parsed.type !== 'string') {
+        // null (arrayAttributeHandler.ts:206). getAuthParams:197-207 propagates the
+        // addSingleMethod failure, so a rejected method drops the relation entry too.
+        if (!isStorableMethod(parsed)) {
           return;
         }
         document[name].push({ id, uri: null });
@@ -221,6 +241,12 @@ class RpcBackend {
     // register() never adds the DID to its own controller set (DIDRegistry.sol:276-285);
     // the subgraph seeds controller = [did] instead (did-registry.ts:264-266), and
     // IDIDRegistry's NatSpec requires resolvers to list the self DID first.
+    //
+    // Past the first entry the order can differ from the subgraph's, and cannot be made
+    // to agree from here: _didControllers is an EnumerableSet, whose remove() swaps the
+    // last element into the freed slot, while the subgraph splices and so keeps insertion
+    // order. Only a DID that has had a controller revoked is affected, and controller is a
+    // set under DID Core, so this is a rendering difference rather than a semantic one.
     const controllers = [
       identifier,
       ...controller.map((c) => uint128ToDID(BigInt(c))),

@@ -25,14 +25,22 @@ class Resolver {
    * @param {string} identifier - The DID to query
    * @returns {Promise<object>} - The resolved DID Document object
    */
-  async resolve(identifier) {
-    if (!DID_XNY_RE.test(identifier)) {
+  async resolve(rawIdentifier) {
+    if (!DID_XNY_RE.test(rawIdentifier)) {
       throw new ResolveError(
-        `Invalid did:xny identifier: ${identifier}`,
+        `Invalid did:xny identifier: ${rawIdentifier}`,
         400,
         'invalidDid'
       );
     }
+    // Upper- and lower-case hex denote the same DID, the canonical form is lowercase, and
+    // a resolver MUST emit it that way (docs/xny-did-method.md:73-86). Normalizing here
+    // rather than per backend is what makes that true for both: the subgraph keys its
+    // entities by the lowercase form and would answer 404 for an upper-case spelling,
+    // while the rpc backend parses either and would otherwise echo the caller's casing
+    // back into id, controller and every fragment of the document it built.
+    const identifier = rawIdentifier.toLowerCase();
+
     try {
       const didDoc = await this.backend.fetch(identifier);
 
@@ -112,13 +120,29 @@ function setting(key) {
   return config.has(key) ? config.get(key) : undefined;
 }
 
+// Reads a positive integer setting, refusing anything else. Coercing quietly would push
+// the failure to request time — or, worse, past a `|| default` and into serving traffic
+// against the wrong chain.
+function integerSetting(key) {
+  const raw = setting(key);
+  if (raw === undefined) {
+    return undefined;
+  }
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${key} is not a positive integer: ${raw}`);
+  }
+  return value;
+}
+
 function createBackend() {
-  const timeoutMs =
-    Number(process.env.RESOLVER_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
+  const timeoutMs = integerSetting('RESOLVER_TIMEOUT_MS') || DEFAULT_TIMEOUT_MS;
 
   // Defaults to rpc: the published image runs on Universal Resolver infrastructure, where
   // no secret can be supplied. The self-hosted instances opt into subgraph explicitly.
-  if ((setting('RESOLVER_BACKEND') || 'rpc') === 'subgraph') {
+  const backend = setting('RESOLVER_BACKEND') || 'rpc';
+
+  if (backend === 'subgraph') {
     return new SubgraphBackend(
       config.get('RESOLVER_GRAPH_URL'),
       config.get('RESOLVER_GRAPH_ACCESS_TOKEN'),
@@ -126,13 +150,19 @@ function createBackend() {
     );
   }
 
+  // Falling through to rpc on a typo would leave a pod healthy and quietly serving
+  // production traffic off a public endpoint, where the only symptom is rate limiting.
+  if (backend !== 'rpc') {
+    throw new Error(
+      `Unknown RESOLVER_BACKEND: ${backend} (expected "rpc" or "subgraph")`
+    );
+  }
+
   return new RpcBackend(
     setting('RESOLVER_RPC_URL'),
     setting('RESOLVER_REGISTRY_ADDRESS'),
     timeoutMs,
-    setting('RESOLVER_CHAIN_ID')
-      ? Number(setting('RESOLVER_CHAIN_ID'))
-      : undefined
+    integerSetting('RESOLVER_CHAIN_ID')
   );
 }
 
