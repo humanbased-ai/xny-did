@@ -23,6 +23,25 @@ const RESOLUTION_PROFILE =
 const FOUND = 'did:xny:11111111-1111-1111-1111-111111111111';
 const NOT_FOUND = 'did:xny:22222222-2222-2222-2222-222222222222';
 const GRAPH_ERROR = 'did:xny:33333333-3333-3333-3333-333333333333';
+const WITH_SERVICE = 'did:xny:44444444-4444-4444-4444-444444444444';
+
+// What the subgraph actually holds for a service: the bytes of the whole on-chain
+// JSON blob, not the endpoint inside it (arrayAttributeHandler.ts:337, typed Bytes!
+// by schema.graphql:61). tests/rpcBackend.test.js asserts the rpc backend decodes
+// the same two values to the same documents.
+const storedService = (value) =>
+  require('ethers').hexlify(
+    require('ethers').toUtf8Bytes(JSON.stringify(value))
+  );
+const STRING_ENDPOINT = {
+  type: 'LinkedDomains',
+  serviceEndpoint: 'https://xny.ai',
+};
+// DID Core admits a map as well as a string, so the decode must not flatten it.
+const MAP_ENDPOINT = {
+  type: 'DIDCommMessaging',
+  serviceEndpoint: { uri: 'https://xny.ai/didcomm', accept: ['didcomm/v2'] },
+};
 
 let server;
 let resolver;
@@ -56,6 +75,37 @@ before(async () => {
                 capabilityInvocation: [],
                 capabilityDelegation: [],
                 service: [],
+              },
+            },
+          })
+        );
+      } else if (didId === WITH_SERVICE) {
+        res.end(
+          JSON.stringify({
+            data: {
+              diddocument: {
+                id: didId,
+                owner: '0x00000000000000000000000000000000000000ab',
+                controllers: [didId],
+                verificationMethod: [],
+                alsoKnownAs: null,
+                authentication: [],
+                assertionMethod: [],
+                keyAgreement: [],
+                capabilityInvocation: [],
+                capabilityDelegation: [],
+                service: [
+                  {
+                    id: `${didId}#service_0`,
+                    type: STRING_ENDPOINT.type,
+                    serviceEndpoint: storedService(STRING_ENDPOINT),
+                  },
+                  {
+                    id: `${didId}#service_1`,
+                    type: MAP_ENDPOINT.type,
+                    serviceEndpoint: storedService(MAP_ENDPOINT),
+                  },
+                ],
               },
             },
           })
@@ -116,6 +166,57 @@ test('known DID -> resolves W3C DID Document', async () => {
   assert.equal(doc.id, FOUND);
   assert.deepEqual(doc.controller, [FOUND]);
   assert.equal(doc.owner, '0x00000000000000000000000000000000000000ab');
+});
+
+test('service: the endpoint is served as written, not as the stored bytes', async () => {
+  const doc = await resolver.resolve(WITH_SERVICE);
+  assert.deepEqual(doc.service[0], {
+    id: `${WITH_SERVICE}#service_0`,
+    type: 'LinkedDomains',
+    serviceEndpoint: 'https://xny.ai',
+  });
+  // The bug this covers served the hex of the whole blob, which is a value DID
+  // Core does not admit and no client can dial.
+  assert.ok(!String(doc.service[0].serviceEndpoint).startsWith('0x'));
+});
+
+test('service: a map endpoint keeps its shape', async () => {
+  const doc = await resolver.resolve(WITH_SERVICE);
+  assert.deepEqual(doc.service[1], {
+    id: `${WITH_SERVICE}#service_1`,
+    type: 'DIDCommMessaging',
+    serviceEndpoint: {
+      uri: 'https://xny.ai/didcomm',
+      accept: ['didcomm/v2'],
+    },
+  });
+});
+
+test('service: the operator cannot displace the id derived from the index', async () => {
+  // Reading serviceEndpoint by name rather than spreading the parsed object is
+  // what keeps this true; a spread would let the blob's own id win.
+  const withOwnId = {
+    type: 'LinkedDomains',
+    id: 'did:xny:99999999-9999-9999-9999-999999999999#whatever',
+    serviceEndpoint: 'https://xny.ai',
+  };
+  const stub = {
+    fetch: async () => ({
+      id: FOUND,
+      owner: '0x00000000000000000000000000000000000000ab',
+      controllers: [FOUND],
+      service: [
+        {
+          id: `${FOUND}#service_0`,
+          type: withOwnId.type,
+          serviceEndpoint: storedService(withOwnId),
+        },
+      ],
+    }),
+  };
+  const doc = await new Resolver(stub).resolve(FOUND);
+  assert.equal(doc.service[0].id, `${FOUND}#service_0`);
+  assert.equal(doc.service[0].serviceEndpoint, 'https://xny.ai');
 });
 
 // --- Content negotiation (W3C DID Resolution HTTPS binding) ---

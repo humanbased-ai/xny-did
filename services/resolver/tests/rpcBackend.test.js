@@ -192,6 +192,10 @@ test('alsoKnownAs with every item revoked is an empty list, not null', () => {
   assert.deepEqual(doc.alsoKnownAs, []);
 });
 
+// The backend's job is to reproduce what the subgraph stores, which for a service
+// is the whole blob — Resolver's assembly is what decodes it, so both backends get
+// the same treatment. The end-to-end expectation is asserted below and mirrored in
+// tests/resolver.test.js for the subgraph path.
 test('service keeps the raw value as serviceEndpoint and needs both fields', () => {
   const value = '{"type":"LinkedDomains","serviceEndpoint":"https://example.com"}';
   const doc = toDidDocumentShape(DID, OWNER, [DID], [
@@ -282,6 +286,36 @@ test('end to end through Resolver: rpc backend produces a W3C DID Document', asy
     },
   ]);
   assert.deepEqual(doc.authentication, [`${DID}#vm_0`]);
+});
+
+test('end to end: services decode to the same documents as the subgraph path', async () => {
+  // Same two values tests/resolver.test.js drives through the subgraph mock, so a
+  // divergence in either backend shows up as one of the two suites failing.
+  const string = { type: 'LinkedDomains', serviceEndpoint: 'https://xny.ai' };
+  const map = {
+    type: 'DIDCommMessaging',
+    serviceEndpoint: { uri: 'https://xny.ai/didcomm', accept: ['didcomm/v2'] },
+  };
+  const backend = backendReturning(OWNER, [], [
+    attribute('service', [
+      item(JSON.stringify(string)),
+      item(JSON.stringify(map)),
+    ]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.deepEqual(doc.service, [
+    {
+      id: `${DID}#service_0`,
+      type: 'LinkedDomains',
+      serviceEndpoint: 'https://xny.ai',
+    },
+    {
+      id: `${DID}#service_1`,
+      type: 'DIDCommMessaging',
+      serviceEndpoint: { uri: 'https://xny.ai/didcomm', accept: ['didcomm/v2'] },
+    },
+  ]);
 });
 
 test('rpc transport failure -> 500 internalError', async () => {

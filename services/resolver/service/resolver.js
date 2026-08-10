@@ -97,7 +97,28 @@ class Resolver {
       }
 
       if (didDoc.service) {
-        document.service = didDoc.service;
+        // The indexer parses the on-chain JSON and validates it, then stores the
+        // whole blob rather than the endpoint it just validated
+        // (arrayAttributeHandler.ts:326-337), and the schema types that Bytes. So
+        // what arrives here is the hex of `{"type":…,"serviceEndpoint":…}`, which
+        // is not a value DID Core admits — it has to be a string URI, a map, or a
+        // set of those, and a client cannot reach a service described by hex.
+        //
+        // Decoding here rather than at the indexer fixes both backends at once
+        // (the rpc backend reproduces the stored shape on purpose) and needs no
+        // reindex. The endpoint is read out by name rather than by spreading the
+        // parsed object, so `id` stays `<did>#service_<index>` and an operator
+        // cannot displace it.
+        //
+        // No fallback on the parse: a service entry only reaches this point once
+        // it has already been parsed once — by the indexer before it created the
+        // entity, or by the rpc backend before it appended the entry.
+        document.service = didDoc.service.map((svc) => ({
+          id: svc.id,
+          type: svc.type,
+          serviceEndpoint: JSON.parse(ethers.toUtf8String(svc.serviceEndpoint))
+            .serviceEndpoint,
+        }));
       }
 
       return document;
