@@ -5,8 +5,13 @@
 #     docker build --platform linux/amd64 -f docker/Dockerfile -t <tag> .
 #
 # The context has to be the service root so .dockerignore applies and the COPY
-# paths below resolve. Cluster nodes are amd64; a build on an Apple Silicon
-# machine produces an arm64 image that will not start there.
+# paths below resolve.
+#
+# Released images are built for linux/amd64 and linux/arm64 alike
+# (publish-resolver-image.yml). The --platform above matters only for what the
+# cluster pulls: its nodes are amd64, and deploy-resolver.yml builds amd64 only,
+# so an arm64 image built by hand on an Apple Silicon machine will not start
+# there.
 
 # Split so the final image carries neither the lockfile-driven install machinery
 # nor anything else the deps stage picked up along the way.

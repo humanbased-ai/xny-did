@@ -1,0 +1,146 @@
+name: Publish resolver image
+
+# The public release of the resolver, separate from deploy-resolver.yml. That one
+# pushes to the private Artifact Registry the cluster pulls from and rolls staging
+# on every merge; this one publishes a versioned image anyone can pull, which is
+# what the Universal Resolver references. Two lifecycles, deliberately not merged.
+#
+# The prefix matters: the repo's plain v1.0.0 / v1.0.1 / v1.0.2 tags version
+# docs/xny-did-method.md, and the W3C DID method registry links into v1.0.1.
+# Resolver releases get their own series so the two cannot be confused.
+on:
+  push:
+    tags:
+      - 'resolver-v*'
+
+permissions:
+  contents: read
+  packages: write
+
+# Serialize per tag. Nothing should be racing to publish the same version, and if
+# something is, the second run must not overwrite the first mid-push.
+concurrency:
+  group: publish-resolver-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/xny-did-resolver
+
+jobs:
+  # Same gate the deploy path uses. A tag is normally pushed at a commit CI has
+  # already been green on, but nothing enforces that, and this image is the one
+  # third parties run.
+  test:
+    uses: ./.github/workflows/resolver-tests.yml
+
+  publish:
+    name: Build and publish
+    needs: test
+    runs-on: ubuntu-latest
+    # The emulated arm64 npm ci is the slow path here; a hang would otherwise burn
+    # the six-hour default.
+    timeout-minutes: 60
+    steps:
+      # Full history: the first-parent check below cannot work on a shallow clone.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A tag can be created on any commit, and this image is public and versioned
+      # — once pulled it cannot be recalled.
+      - name: Check the tag
+        id: tag
+        run: |
+          version="${GITHUB_REF_NAME#resolver-v}"
+
+          # A glob would not do: `1.0.0+build` is legal semver and legal in
+          # package.json but is an illegal Docker tag, and would fail at the push
+          # after a full multi-arch build.
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::$GITHUB_REF_NAME does not carry an x.y.z version"
+            exit 1
+          fi
+
+          # Two of the repo's three existing tags are annotated, and on a push of
+          # an annotated tag the ref's object is the tag, not the commit — so
+          # github.sha cannot be used as a revision. Peel it once here and use
+          # this everywhere a commit is meant.
+          revision=$(git rev-parse "refs/tags/${GITHUB_REF_NAME}^{commit}")
+
+          # FETCH_HEAD rather than a remote-tracking ref: a single explicit
+          # refspec leaves no ambiguity about what is being compared.
+          git fetch --quiet origin main
+
+          # First-parent, not `merge-base --is-ancestor`. The repo merges rather
+          # than squashes, so every intermediate commit of every merged branch is
+          # an ancestor of main — including work-in-progress commits that were
+          # never main's tip and never had CI run against them. First-parent is
+          # the set of commits main actually pointed at.
+          if ! git rev-list --first-parent FETCH_HEAD | grep -qxF "$revision"; then
+            echo "::error::$GITHUB_REF_NAME points at $revision, which was never a commit on main"
+            exit 1
+          fi
+
+          declared=$(node -p "require('./services/resolver/package.json').version")
+          if [ "$version" != "$declared" ]; then
+            echo "::error::tag says $version, services/resolver/package.json says $declared"
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Git tags are mutable; published versions are not meant to be. Deleting and
+      # re-pushing a tag at another commit would otherwise silently replace the
+      # image that a Universal Resolver docker-compose entry pins.
+      - name: Refuse to republish an existing version
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          if docker manifest inspect "$IMAGE:$VERSION" >/dev/null 2>&1; then
+            echo "::error::$IMAGE:$VERSION already exists; publish a new version instead"
+            exit 1
+          fi
+
+      # arm64 is emulated on the runner, which is slow — several minutes for the
+      # npm ci layer. Worth it here: UR contributors and DIF maintainers run the
+      # compose stack on Apple Silicon, and this is a per-release cost, not a
+      # per-commit one.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/build-push-action@v6
+        with:
+          # The service root, not the repo root: .dockerignore only applies at the
+          # context root, and the Dockerfile's COPY paths are relative to it.
+          context: services/resolver
+          file: services/resolver/docker/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          # No `latest`. The DIF driver docs require implementers to pin a version
+          # in docker-compose.yml rather than track a floating tag, and a `latest`
+          # that exists is a `latest` someone will reference.
+          tags: ${{ env.IMAGE }}:${{ steps.tag.outputs.version }}
+          # image.source is what links the package back to this repository on the
+          # GHCR package page.
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.tag.outputs.version }}
+            org.opencontainers.image.revision=${{ steps.tag.outputs.revision }}
+            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.description=Universal Resolver driver for the did:xny DID method
+          # Read the cache main writes, but do not write one: an Actions cache
+          # scoped to refs/tags/resolver-vX is readable by nothing afterwards.
+          cache-from: type=gha
+
+      - name: Remind about package visibility
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          echo "::notice::Published ${IMAGE}:${VERSION}. A GHCR package is private by default even under a public repository — if this is the first release, set the package to public or anonymous pulls will 404."
