@@ -318,6 +318,34 @@ test('end to end: services decode to the same documents as the subgraph path', a
   ]);
 });
 
+test('a service blob with invalid UTF-8 does not 500 the whole document', async () => {
+  // The backend decodes leniently to match graph-ts, so it keeps this entry. If the
+  // assembly decoded strictly it would throw on the same bytes, and the catch in
+  // resolve() would turn one operator's malformed entry into a 500 for every DID
+  // that has one.
+  const good = Buffer.from(
+    JSON.stringify({ type: 'LinkedDomains', serviceEndpoint: 'https://xny.ai/' }),
+    'utf8'
+  );
+  const withBadByte = Buffer.concat([
+    good.subarray(0, good.length - 2),
+    Buffer.from([0xff]),
+    good.subarray(good.length - 2),
+  ]);
+
+  const backend = backendReturning(OWNER, [], [
+    {
+      name: 'service',
+      values: [{ value: '0x' + withBadByte.toString('hex'), revoked: false }],
+    },
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.equal(doc.service.length, 1);
+  // U+FFFD where the bad byte was, which is what the indexer would have stored too.
+  assert.equal(doc.service[0].serviceEndpoint, 'https://xny.ai/�');
+});
+
 test('rpc transport failure -> 500 internalError', async () => {
   const backend = new RpcBackend();
   backend.registry = {

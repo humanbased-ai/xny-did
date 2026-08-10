@@ -192,11 +192,67 @@ test('service: a map endpoint keeps its shape', async () => {
   });
 });
 
-test('service: the operator cannot displace the id derived from the index', async () => {
+test('service: endpoints DID Core does not admit are dropped', async () => {
+  // The indexer only checks that the key exists, so all of these reach assembly.
+  const cases = [
+    ['explicit null', null],
+    ['a number', 42],
+    ['a boolean', false],
+    ['an empty set', []],
+    ['a set with a non-endpoint in it', ['https://xny.ai', 7]],
+  ];
+  for (const [label, endpoint] of cases) {
+    const stub = {
+      fetch: async () => ({
+        id: FOUND,
+        owner: '0x00000000000000000000000000000000000000ab',
+        controllers: [FOUND],
+        service: [
+          {
+            id: `${FOUND}#service_0`,
+            type: 'LinkedDomains',
+            serviceEndpoint: storedService({
+              type: 'LinkedDomains',
+              serviceEndpoint: endpoint,
+            }),
+          },
+        ],
+      }),
+    };
+    const doc = await new Resolver(stub).resolve(FOUND);
+    assert.deepEqual(doc.service, [], `${label} should have been dropped`);
+  }
+});
+
+test('service: a set of endpoints is kept', async () => {
+  const endpoint = ['https://xny.ai', { uri: 'https://xny.ai/didcomm' }];
+  const stub = {
+    fetch: async () => ({
+      id: FOUND,
+      owner: '0x00000000000000000000000000000000000000ab',
+      controllers: [FOUND],
+      service: [
+        {
+          id: `${FOUND}#service_0`,
+          type: 'LinkedDomains',
+          serviceEndpoint: storedService({
+            type: 'LinkedDomains',
+            serviceEndpoint: endpoint,
+          }),
+        },
+      ],
+    }),
+  };
+  const doc = await new Resolver(stub).resolve(FOUND);
+  assert.deepEqual(doc.service[0].serviceEndpoint, endpoint);
+});
+
+test('service: only the endpoint is taken from the blob, id and type come from the entity', async () => {
   // Reading serviceEndpoint by name rather than spreading the parsed object is
-  // what keeps this true; a spread would let the blob's own id win.
-  const withOwnId = {
-    type: 'LinkedDomains',
+  // what keeps this true; a spread would let the blob's own id and type win, and
+  // the id it carries points into a different DID.
+  const blob = {
+    type: 'Impersonated',
     id: 'did:xny:99999999-9999-9999-9999-999999999999#whatever',
     serviceEndpoint: 'https://xny.ai',
   };
@@ -208,15 +264,18 @@ test('service: the operator cannot displace the id derived from the index', asyn
       service: [
         {
           id: `${FOUND}#service_0`,
-          type: withOwnId.type,
-          serviceEndpoint: storedService(withOwnId),
+          type: 'LinkedDomains',
+          serviceEndpoint: storedService(blob),
         },
       ],
     }),
   };
   const doc = await new Resolver(stub).resolve(FOUND);
-  assert.equal(doc.service[0].id, `${FOUND}#service_0`);
-  assert.equal(doc.service[0].serviceEndpoint, 'https://xny.ai');
+  assert.deepEqual(doc.service[0], {
+    id: `${FOUND}#service_0`,
+    type: 'LinkedDomains',
+    serviceEndpoint: 'https://xny.ai',
+  });
 });
 
 // --- Content negotiation (W3C DID Resolution HTTPS binding) ---

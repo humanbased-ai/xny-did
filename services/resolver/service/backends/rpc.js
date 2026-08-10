@@ -2,6 +2,10 @@
 
 const ethers = require('ethers');
 const { DEFAULT_TIMEOUT_MS } = require('./subgraph');
+// graph-ts' Bytes.toString() decodes UTF-8 leniently, so this substitutes rather than
+// rejecting. Shared with the document assembly, which decodes service values a second
+// time and has to reach the same verdict — see service/bytes.js.
+const { bytesToString } = require('../bytes');
 
 // Base mainnet is the authoritative deployment for did:xny (see docs/xny-did-method.md),
 // and both of these are public: the endpoint takes no API key and the address is the
@@ -37,12 +41,6 @@ function didToUint128(identifier) {
 function uint128ToDID(value) {
   const hex = value.toString(16).padStart(32, '0');
   return `did:xny:${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-}
-
-// graph-ts' Bytes.toString() decodes UTF-8 leniently; toUtf8String throws by default, so
-// match the indexer and substitute rather than reject the whole document.
-function bytesToString(hexValue) {
-  return ethers.toUtf8String(hexValue, ethers.Utf8ErrorFuncs.replace);
 }
 
 function parseJsonObject(hexValue) {

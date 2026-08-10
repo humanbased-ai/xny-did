@@ -1,6 +1,7 @@
 const ethers = require('ethers');
 const config = require('config');
 const { ResolveError } = require('./resolveError');
+const { bytesToString } = require('./bytes');
 const { SubgraphBackend, DEFAULT_TIMEOUT_MS } = require('./backends/subgraph');
 const { RpcBackend } = require('./backends/rpc');
 
@@ -11,6 +12,20 @@ const { RpcBackend } = require('./backends/rpc');
 // method name are lowercase); only the hex section accepts upper/lower case.
 const DID_XNY_RE =
   /^did:xny:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
+
+// DID Core §5.4: a serviceEndpoint is a string URI, a map, or a set composed of one
+// or more of those.
+function isServiceEndpoint(value) {
+  const isMap = (v) => typeof v === 'object' && v !== null && !Array.isArray(v);
+  if (typeof value === 'string' || isMap(value)) {
+    return true;
+  }
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((entry) => typeof entry === 'string' || isMap(entry))
+  );
+}
 
 class Resolver {
   /**
@@ -113,12 +128,22 @@ class Resolver {
         // No fallback on the parse: a service entry only reaches this point once
         // it has already been parsed once — by the indexer before it created the
         // entity, or by the rpc backend before it appended the entry.
-        document.service = didDoc.service.map((svc) => ({
-          id: svc.id,
-          type: svc.type,
-          serviceEndpoint: JSON.parse(ethers.toUtf8String(svc.serviceEndpoint))
-            .serviceEndpoint,
-        }));
+        // bytesToString, not ethers' default: the rpc backend proved this blob
+        // parseable using the lenient decode, and a strict one here would reject
+        // bytes it accepted — turning one operator's malformed service entry into
+        // a 500 for the whole document.
+        document.service = didDoc.service
+          .map((svc) => ({
+            id: svc.id,
+            type: svc.type,
+            serviceEndpoint: JSON.parse(bytesToString(svc.serviceEndpoint))
+              .serviceEndpoint,
+          }))
+          // The indexer only checks that a serviceEndpoint key exists, so null,
+          // numbers and booleans all reach this point. DID Core admits a string, a
+          // map, or a set of those and nothing else, and an entry no client can
+          // dial is worth less than no entry at all.
+          .filter((svc) => isServiceEndpoint(svc.serviceEndpoint));
       }
 
       return document;
