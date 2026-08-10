@@ -49,28 +49,11 @@ env:
   IMAGE: asia-southeast1-docker.pkg.dev/humanbased-ai/humanbased/xny-did-resolver
 
 jobs:
-  # The repo-wide CI workflow covers the Foundry project and the Python scripts
-  # only, so without this the resolver's own suite would never gate a deploy.
+  # The same job that gates a pull request, called rather than copied so the two
+  # cannot drift. The repo-wide CI workflow covers the Foundry project and the
+  # Python scripts only, so this is still what keeps a deploy behind the suite.
   test:
-    name: Resolver tests
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/resolver
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: services/resolver/package-lock.json
-
-      # `ci`, not `install`, for the same reason the image uses it: install
-      # exactly the lockfile, and fail if package.json has drifted from it.
-      - run: npm ci
-
-      - run: node --test
+    uses: ./.github/workflows/resolver-tests.yml
 
   deploy:
     name: Build, push and roll out
