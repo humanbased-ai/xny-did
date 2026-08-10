@@ -88,11 +88,27 @@ class Resolver {
           } catch (e) {
             console.warn('Error decoding verification method value', e);
           }
+          // Discard the blob's attempts at the three fields the resolver is
+          // responsible for, and spread what remains: key material and
+          // method-specific fields still come through, which is the point of the
+          // spread.
+          //
+          // These used to be assigned before the spread, so a blob carrying its own
+          // `id` displaced the `#vm_<index>` name derived from the array position —
+          // and every relationship entry pointing at that name was then left
+          // dereferencing nothing. `authentication` would name `#vm_0` while the
+          // only method in the document called itself something else, so the DID
+          // could not be used to authenticate at all. The id it supplied could also
+          // name a fragment of a DID it does not control.
+          //
+          // Naming them rather than relying on spread order both says what is being
+          // dropped and keeps the field order the document has always had.
+          const { id, type, controller, ...methodFields } = methodDetails;
           return {
             id: vm.id,
             type: vm.method.type,
             controller: didDoc.id,
-            ...methodDetails,
+            ...methodFields,
           };
         });
       }

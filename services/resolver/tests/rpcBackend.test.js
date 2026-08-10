@@ -346,6 +346,63 @@ test('a service blob with invalid UTF-8 does not 500 the whole document', async 
   assert.equal(doc.service[0].serviceEndpoint, 'https://xny.ai/�');
 });
 
+test('a blob cannot displace the id, type or controller the resolver derives', async () => {
+  // No controller field on purpose: a blob whose controller is a DID string is
+  // dropped by the indexer's own rule (reproduced in toDidDocumentShape), so
+  // omitting it is what actually reaches assembly.
+  const blob = {
+    type: 'Impersonated',
+    id: `${OTHER_DID}#hijacked`,
+    publicKeyMultibase: 'z6MkAttackerKey',
+  };
+  const backend = backendReturning(OWNER, [], [
+    attribute('verificationMethod', [
+      item(JSON.stringify({ ...blob, type: 'Ed25519VerificationKey2020' })),
+    ]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.deepEqual(doc.verificationMethod, [
+    {
+      id: `${DID}#vm_0`,
+      type: 'Ed25519VerificationKey2020',
+      controller: DID,
+      // Key material the operator supplied still comes through — that is what the
+      // spread is for.
+      publicKeyMultibase: 'z6MkAttackerKey',
+    },
+  ]);
+});
+
+test('every relationship reference dereferences to a verification method in the document', async () => {
+  // The harm the id displacement caused, stated as the property that has to hold:
+  // authentication names a method by id, and a verifier has to be able to find it.
+  const backend = backendReturning(OWNER, [], [
+    attribute('verificationMethod', [
+      item(
+        JSON.stringify({
+          type: 'Ed25519VerificationKey2020',
+          id: `${OTHER_DID}#hijacked`,
+          publicKeyMultibase: 'z6Mk',
+        })
+      ),
+    ]),
+    attribute('authentication', [item('0')]),
+    attribute('assertionMethod', [item('0')]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  const known = new Set(doc.verificationMethod.map((vm) => vm.id));
+  for (const relation of ['authentication', 'assertionMethod']) {
+    for (const reference of doc[relation]) {
+      assert.ok(
+        known.has(reference),
+        `${relation} names ${reference}, which is not in verificationMethod`
+      );
+    }
+  }
+});
+
 test('rpc transport failure -> 500 internalError', async () => {
   const backend = new RpcBackend();
   backend.registry = {
