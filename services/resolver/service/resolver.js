@@ -83,7 +83,13 @@ class Resolver {
           let methodDetails = {};
           try {
             if (vm.method.value && vm.method.value.startsWith('0x')) {
-              methodDetails = JSON.parse(ethers.toUtf8String(vm.method.value));
+              // bytesToString, not ethers' default: the rpc backend proved this
+              // blob parseable using the lenient decode, and a strict one here
+              // rejected bytes it had accepted — the catch below then swallowed it
+              // and emitted a verification method with no key material at all, plus
+              // an ethers stack trace per request. Same decoder on both sides means
+              // the catch can no longer fire for a value either backend supplied.
+              methodDetails = JSON.parse(bytesToString(vm.method.value));
             }
           } catch (e) {
             console.warn('Error decoding verification method value', e);

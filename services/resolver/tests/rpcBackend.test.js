@@ -374,6 +374,37 @@ test('a blob cannot displace the id, type or controller the resolver derives', a
   ]);
 });
 
+test('a verification method with an invalid UTF-8 byte keeps its key material', async () => {
+  // The backend decodes leniently to match graph-ts and keeps this entry. A strict
+  // decode during assembly threw on the same bytes, the catch swallowed it, and the
+  // method was emitted with no key material — a verification method that cannot
+  // verify anything, silently.
+  const good = Buffer.from(
+    JSON.stringify({
+      type: 'Ed25519VerificationKey2020',
+      publicKeyMultibase: 'z6MkRealKey',
+    }),
+    'utf8'
+  );
+  const withBadByte = Buffer.concat([
+    good.subarray(0, good.length - 2),
+    Buffer.from([0xff]),
+    good.subarray(good.length - 2),
+  ]);
+
+  const backend = backendReturning(OWNER, [], [
+    {
+      name: 'verificationMethod',
+      values: [{ value: '0x' + withBadByte.toString('hex'), revoked: false }],
+    },
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.equal(doc.verificationMethod.length, 1);
+  // U+FFFD where the bad byte was, which is what the indexer would have stored too.
+  assert.equal(doc.verificationMethod[0].publicKeyMultibase, 'z6MkRealKey�');
+});
+
 test('every relationship reference dereferences to a verification method in the document', async () => {
   // The harm the id displacement caused, stated as the property that has to hold:
   // authentication names a method by id, and a verifier has to be able to find it.
