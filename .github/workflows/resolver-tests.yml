@@ -1,0 +1,44 @@
+name: Resolver tests
+
+# Two entry points, one definition. `pull_request` is what makes the suite gate a
+# change under review; `workflow_call` is how deploy-resolver.yml reuses the exact
+# same job as its pre-deploy gate, so the two can never drift apart on the node
+# version or the cache key.
+#
+# The repo-wide CI workflow (test.yml) covers the Foundry project and the Python
+# scripts only. Before this workflow existed the resolver suite ran solely inside
+# the deploy workflow, which has no pull_request trigger — so it first executed
+# after a merge, with main already carrying the change.
+on:
+  pull_request:
+    paths:
+      - 'services/resolver/**'
+      - '.github/workflows/resolver-tests.yml'
+  workflow_call:
+
+jobs:
+  test:
+    name: Resolver tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/resolver
+    steps:
+      - uses: actions/checkout@v4
+
+      # Matches the runtime the image ships (docker/Dockerfile uses node:22-alpine).
+      # package.json declares a floor of >=20; testing on the version that actually
+      # runs in the cluster is the one that matters here.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: services/resolver/package-lock.json
+
+      # `ci`, not `install`, for the same reason the image uses it: install
+      # exactly the lockfile, and fail if package.json has drifted from it.
+      - run: npm ci
+
+      # The suite is self-contained — no environment is set here on purpose, which
+      # is also what proves the default rpc backend needs no configuration.
+      - run: node --test
