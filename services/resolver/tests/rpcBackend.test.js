@@ -192,6 +192,10 @@ test('alsoKnownAs with every item revoked is an empty list, not null', () => {
   assert.deepEqual(doc.alsoKnownAs, []);
 });
 
+// The backend's job is to reproduce what the subgraph stores, which for a service
+// is the whole blob — Resolver's assembly is what decodes it, so both backends get
+// the same treatment. The end-to-end expectation is asserted below and mirrored in
+// tests/resolver.test.js for the subgraph path.
 test('service keeps the raw value as serviceEndpoint and needs both fields', () => {
   const value = '{"type":"LinkedDomains","serviceEndpoint":"https://example.com"}';
   const doc = toDidDocumentShape(DID, OWNER, [DID], [
@@ -282,6 +286,64 @@ test('end to end through Resolver: rpc backend produces a W3C DID Document', asy
     },
   ]);
   assert.deepEqual(doc.authentication, [`${DID}#vm_0`]);
+});
+
+test('end to end: services decode to the same documents as the subgraph path', async () => {
+  // Same two values tests/resolver.test.js drives through the subgraph mock, so a
+  // divergence in either backend shows up as one of the two suites failing.
+  const string = { type: 'LinkedDomains', serviceEndpoint: 'https://xny.ai' };
+  const map = {
+    type: 'DIDCommMessaging',
+    serviceEndpoint: { uri: 'https://xny.ai/didcomm', accept: ['didcomm/v2'] },
+  };
+  const backend = backendReturning(OWNER, [], [
+    attribute('service', [
+      item(JSON.stringify(string)),
+      item(JSON.stringify(map)),
+    ]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.deepEqual(doc.service, [
+    {
+      id: `${DID}#service_0`,
+      type: 'LinkedDomains',
+      serviceEndpoint: 'https://xny.ai',
+    },
+    {
+      id: `${DID}#service_1`,
+      type: 'DIDCommMessaging',
+      serviceEndpoint: { uri: 'https://xny.ai/didcomm', accept: ['didcomm/v2'] },
+    },
+  ]);
+});
+
+test('a service blob with invalid UTF-8 does not 500 the whole document', async () => {
+  // The backend decodes leniently to match graph-ts, so it keeps this entry. If the
+  // assembly decoded strictly it would throw on the same bytes, and the catch in
+  // resolve() would turn one operator's malformed entry into a 500 for every DID
+  // that has one.
+  const good = Buffer.from(
+    JSON.stringify({ type: 'LinkedDomains', serviceEndpoint: 'https://xny.ai/' }),
+    'utf8'
+  );
+  const withBadByte = Buffer.concat([
+    good.subarray(0, good.length - 2),
+    Buffer.from([0xff]),
+    good.subarray(good.length - 2),
+  ]);
+
+  const backend = backendReturning(OWNER, [], [
+    {
+      name: 'service',
+      values: [{ value: '0x' + withBadByte.toString('hex'), revoked: false }],
+    },
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.equal(doc.service.length, 1);
+  // U+FFFD where the bad byte was, which is what the indexer would have stored too.
+  assert.equal(doc.service[0].serviceEndpoint, 'https://xny.ai/�');
 });
 
 test('rpc transport failure -> 500 internalError', async () => {
