@@ -1,18 +1,14 @@
 'use strict';
 
-// resolver.js builds a config-backed singleton at module load (config.get throws if
-// RESOLVER_GRAPH_URL / RESOLVER_GRAPH_ACCESS_TOKEN are unset). Provide dummies before
-// requiring it so the suite is self-contained on a clean checkout; tests use their own
-// mock-server instances.
-process.env.RESOLVER_GRAPH_URL =
-  process.env.RESOLVER_GRAPH_URL || 'http://unused.local';
-process.env.RESOLVER_GRAPH_ACCESS_TOKEN =
-  process.env.RESOLVER_GRAPH_ACCESS_TOKEN || 'test';
+// No environment is set up here on purpose: resolver.js builds a config-backed singleton
+// at module load, and requiring it on a clean checkout is the check that the default rpc
+// backend needs no configuration. Tests drive their own backend instances.
 
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const http = require('http');
 const { Resolver } = require('../service/resolver');
+const { SubgraphBackend } = require('../service/backends/subgraph');
 const {
   negotiateRepresentation,
   toDidDocumentJson,
@@ -72,7 +68,9 @@ before(async () => {
     });
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  resolver = new Resolver(`http://127.0.0.1:${server.address().port}`, 'token');
+  resolver = new Resolver(
+    new SubgraphBackend(`http://127.0.0.1:${server.address().port}`, 'token')
+  );
 });
 
 after(() => server.close());
@@ -275,9 +273,7 @@ test('hung upstream -> rejects within the configured timeout', async () => {
   await new Promise((resolve) => hung.listen(0, '127.0.0.1', resolve));
 
   const slow = new Resolver(
-    `http://127.0.0.1:${hung.address().port}`,
-    'token',
-    150
+    new SubgraphBackend(`http://127.0.0.1:${hung.address().port}`, 'token', 150)
   );
 
   try {
@@ -304,8 +300,7 @@ test('hung upstream -> rejects within the configured timeout', async () => {
 });
 
 test('timeout defaults when not supplied', () => {
-  const r = new Resolver('http://unused.local', 'token');
-  assert.equal(r.timeoutMs, 10000);
+  assert.equal(new SubgraphBackend('http://unused.local', 'token').timeoutMs, 10000);
 });
 
 // --- Probe routes ---

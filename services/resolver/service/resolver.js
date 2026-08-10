@@ -1,5 +1,8 @@
 const ethers = require('ethers');
 const config = require('config');
+const { ResolveError } = require('./resolveError');
+const { SubgraphBackend, DEFAULT_TIMEOUT_MS } = require('./backends/subgraph');
+const { RpcBackend } = require('./backends/rpc');
 
 // did:xny:<uuid> — the uuid is a uint128 rendered as 8-4-4-4-12 hex.
 // It is NOT a strict v4 UUID (the on-chain uint128 carries no version/variant bits),
@@ -9,36 +12,16 @@ const config = require('config');
 const DID_XNY_RE =
   /^did:xny:[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$/;
 
-// Carries the HTTP status + DID Resolution error code so the controller can map it.
-class ResolveError extends Error {
-  constructor(message, status, code) {
-    super(message);
-    this.name = 'ResolveError';
-    this.status = status;
-    this.code = code;
-  }
-}
-
-// ethers' FetchRequest defaults to a 5-minute timeout, long enough that a stalled
-// subgraph would tie up connections until the pod stops serving. Bound it to
-// something a probe interval can outlive.
-const DEFAULT_TIMEOUT_MS = 10000;
-
 class Resolver {
   /**
-   * Constructor
-   * @param {string} graphUrl - The Graph API URL
-   * @param {string} accessToken - The Authorization token
-   * @param {number} [timeoutMs] - Upstream request timeout, ms
+   * @param {{fetch: (identifier: string) => Promise<object|null>}} backend
    */
-  constructor(graphUrl, accessToken, timeoutMs) {
-    this.graphUrl = graphUrl;
-    this.accessToken = accessToken;
-    this.timeoutMs = timeoutMs || DEFAULT_TIMEOUT_MS;
+  constructor(backend) {
+    this.backend = backend;
   }
 
   /**
-   * Query the DID Document from The Graph
+   * Resolve a did:xny identifier to its DID Document.
    * @param {string} identifier - The DID to query
    * @returns {Promise<object>} - The resolved DID Document object
    */
@@ -51,30 +34,8 @@ class Resolver {
       );
     }
     try {
-      const query = `query($didId: ID!) { diddocument(id: $didId) { id owner controllers: controller verificationMethod { id method { id type value } } alsoKnownAs authentication { id uri } assertionMethod { id uri } keyAgreement { id uri } capabilityInvocation { id uri } capabilityDelegation { id uri } service { id type serviceEndpoint } } }`;
+      const didDoc = await this.backend.fetch(identifier);
 
-      const req = new ethers.FetchRequest(this.graphUrl);
-      req.method = 'POST';
-      req.timeout = this.timeoutMs;
-      req.setHeader('Content-Type', 'application/json');
-      req.setHeader('Authorization', this.accessToken);
-      req.body = {
-        query: query,
-        variables: { didId: identifier },
-      };
-
-      const response = await req.send();
-      const result = response.bodyJson;
-
-      if (result.errors) {
-        throw new ResolveError(
-          result.errors.map((e) => e.message).join(', '),
-          500,
-          'internalError'
-        );
-      }
-
-      const didDoc = result.data.diddocument;
       if (!didDoc) {
         throw new ResolveError(
           `DID Document not found for identifier: ${identifier}`,
@@ -137,20 +98,45 @@ class Resolver {
       if (error instanceof ResolveError) {
         throw error;
       }
-      // Network / GraphQL transport failures map to internalError (500).
+      // Network / GraphQL / RPC transport failures map to internalError (500).
       throw new ResolveError(error.message, 500, 'internalError');
     }
   }
 }
 
-// config.get() throws on a missing key, which is the behaviour we want here: a pod
-// with no upstream configured should fail to start rather than come up healthy and
-// return errors for every resolution.
-const ResolverInstance = new Resolver(
-  config.get('RESOLVER_GRAPH_URL'),
-  config.get('RESOLVER_GRAPH_ACCESS_TOKEN'),
-  Number(process.env.RESOLVER_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS
-);
+// config.get() throws on a missing key. That is the behaviour we want for the subgraph
+// backend — a pod with no upstream configured should fail to start rather than come up
+// healthy and return errors for every resolution — but the rpc backend has to boot with
+// no configuration at all, so its keys are read through this instead.
+function setting(key) {
+  return config.has(key) ? config.get(key) : undefined;
+}
+
+function createBackend() {
+  const timeoutMs =
+    Number(process.env.RESOLVER_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
+
+  // Defaults to rpc: the published image runs on Universal Resolver infrastructure, where
+  // no secret can be supplied. The self-hosted instances opt into subgraph explicitly.
+  if ((setting('RESOLVER_BACKEND') || 'rpc') === 'subgraph') {
+    return new SubgraphBackend(
+      config.get('RESOLVER_GRAPH_URL'),
+      config.get('RESOLVER_GRAPH_ACCESS_TOKEN'),
+      timeoutMs
+    );
+  }
+
+  return new RpcBackend(
+    setting('RESOLVER_RPC_URL'),
+    setting('RESOLVER_REGISTRY_ADDRESS'),
+    timeoutMs,
+    setting('RESOLVER_CHAIN_ID')
+      ? Number(setting('RESOLVER_CHAIN_ID'))
+      : undefined
+  );
+}
+
+const ResolverInstance = new Resolver(createBackend());
 
 module.exports = ResolverInstance;
 module.exports.Resolver = Resolver;

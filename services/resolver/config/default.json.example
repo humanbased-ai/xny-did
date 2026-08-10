@@ -1,4 +1,6 @@
 {
+  "_comment": "Only needed to run the subgraph backend locally. The default rpc backend needs no configuration at all.",
+  "RESOLVER_BACKEND": "subgraph",
   "RESOLVER_GRAPH_URL": "https://api.studio.thegraph.com/query/1757359/did-base/version/latest",
   "RESOLVER_GRAPH_ACCESS_TOKEN": "YOUR_GRAPH_ACCESS_TOKEN"
 }
