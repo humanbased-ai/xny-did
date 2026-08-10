@@ -16,6 +16,14 @@ on:
       - '.github/workflows/resolver-tests.yml'
   workflow_call:
 
+# Declared rather than inherited. On the workflow_call path this job would
+# otherwise pick up the deploy workflow's `id-token: write`, which would leave
+# `npm ci` — and every dependency lifecycle script it runs — holding a token that
+# can be traded for GCP credentials. A called workflow can only downgrade the
+# caller's permissions, so this is safe for the deploy path.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Resolver tests
