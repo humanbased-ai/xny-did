@@ -168,6 +168,29 @@ test('known DID -> resolves W3C DID Document', async () => {
   assert.equal(doc.owner, '0x00000000000000000000000000000000000000ab');
 });
 
+test('subgraph path: a relationship entry with no uri is dropped', async () => {
+  // This is the shape the GraphQL query returns for an entry whose on-chain value was
+  // a JSON object: the indexer stored an embedded method and left uri null, and the
+  // query selects only { id uri }. The assembly is shared, so this pins that the
+  // subgraph path gets the same treatment as the rpc one.
+  const stub = {
+    fetch: async () => ({
+      id: FOUND,
+      owner: '0x00000000000000000000000000000000000000ab',
+      controllers: [FOUND],
+      authentication: [
+        { id: `${FOUND}#auth_0`, uri: null },
+        { id: `${FOUND}#auth_1`, uri: `${FOUND}#vm_0` },
+      ],
+      keyAgreement: [{ id: `${FOUND}#ka_0`, uri: null }],
+    }),
+  };
+  const doc = await new Resolver(stub).resolve(FOUND);
+
+  assert.deepEqual(doc.authentication, [`${FOUND}#vm_0`]);
+  assert.ok(!('keyAgreement' in doc), JSON.stringify(doc.keyAgreement));
+});
+
 test('subgraph path: a blob cannot displace the derived id, or smuggle __proto__', async () => {
   // The rpc backend validates every blob before assembly; this backend forwards
   // whatever graph-node returns, unchecked (subgraph.js). So "one change covers both
