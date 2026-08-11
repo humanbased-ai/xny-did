@@ -1,7 +1,7 @@
 const ethers = require('ethers');
 const config = require('config');
 const { ResolveError } = require('./resolveError');
-const { bytesToString } = require('./bytes');
+const { bytesToString, parseJsonObject } = require('./bytes');
 const { SubgraphBackend, DEFAULT_TIMEOUT_MS } = require('./backends/subgraph');
 const { RpcBackend } = require('./backends/rpc');
 
@@ -80,24 +80,18 @@ class Resolver {
 
       if (didDoc.verificationMethod) {
         document.verificationMethod = didDoc.verificationMethod.map((vm) => {
-          let methodDetails = {};
-          try {
-            if (vm.method.value && vm.method.value.startsWith('0x')) {
-              // bytesToString, not ethers' default: the rpc backend proved this
-              // blob parseable using the lenient decode, and a strict one here
-              // rejected bytes it had accepted — the catch below then swallowed it
-              // and emitted a verification method with no key material at all, plus
-              // an ethers stack trace per request. Same decoder on both sides means
-              // the catch can no longer fire for a value either backend supplied.
-              methodDetails = JSON.parse(bytesToString(vm.method.value));
-            }
-          } catch (e) {
-            console.warn('Error decoding verification method value', e);
-          }
-          // Discard the blob's attempts at the three fields the resolver is
-          // responsible for, and spread what remains: key material and
-          // method-specific fields still come through, which is the point of the
-          // spread.
+          // The same decode the rpc backend validated this blob with, and the same
+          // object-or-nothing verdict. Decoding strictly here rejected bytes the
+          // backend had accepted, which used to be swallowed into a method with no
+          // key material at all; and anything that is not a JSON object cannot
+          // contribute fields — a string would spread its indices in as fields, and
+          // a null would throw in the destructure below, which sits outside any
+          // catch and so would fail the whole document over one entry.
+          const methodDetails = parseJsonObject(vm.method.value) || {};
+
+          // Discard the blob's attempts at the fields the resolver is responsible
+          // for, and spread what remains: key material and method-specific fields
+          // still come through, which is the point of the spread.
           //
           // These used to be assigned before the spread, so a blob carrying its own
           // `id` displaced the `#vm_<index>` name derived from the array position —
@@ -107,9 +101,25 @@ class Resolver {
           // could not be used to authenticate at all. The id it supplied could also
           // name a fragment of a DID it does not control.
           //
-          // Naming them rather than relying on spread order both says what is being
+          // `__proto__` is dropped for a different reason: it is inert inside this
+          // process (JSON.parse and spread both create a plain own property) but
+          // serializing it hands every downstream consumer a prototype-pollution
+          // gadget — an ordinary `Object.assign` into a record replaces that
+          // record's prototype, and a hand-rolled recursive merge pollutes
+          // `Object.prototype` process-wide. `constructor` is inert under spread and
+          // goes with it. `type` cannot actually be displaced — the derived value is
+          // read from this very blob — and is named for symmetry.
+          //
+          // Naming these rather than relying on spread order both says what is being
           // dropped and keeps the field order the document has always had.
-          const { id, type, controller, ...methodFields } = methodDetails;
+          const {
+            id,
+            type,
+            controller,
+            __proto__: _proto,
+            constructor: _constructor,
+            ...methodFields
+          } = methodDetails;
           return {
             id: vm.id,
             type: vm.method.type,
