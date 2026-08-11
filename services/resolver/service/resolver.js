@@ -150,17 +150,31 @@ class Resolver {
         // verification methods in a relationship (docs/xny-did-method.md:138-142) —
         // the value is out of spec at rest, and nothing usable is lost by leaving it
         // out. Logged so that it is not lost silently.
-        const references = (didDoc[relation] || [])
-          .filter((item) => {
-            if (item.uri) {
-              return true;
-            }
-            console.warn(
-              `Dropping ${relation} entry ${item.id}: no uri, so its on-chain value was an inline verification method, which did:xny does not express in a relationship`
-            );
-            return false;
-          })
-          .map((item) => item.uri);
+        // A reference is a non-empty string on every path either backend can take —
+        // the indexer builds it from a template or a validated DID, never blank. The
+        // check is written out rather than left to truthiness because the
+        // verificationMethod step above hardens against a subgraph response that is
+        // not the shape the schema promises, and this step should hold the same
+        // posture.
+        const references = [];
+        const dropped = [];
+        for (const item of didDoc[relation] || []) {
+          if (typeof item.uri === 'string' && item.uri.length > 0) {
+            references.push(item.uri);
+          } else {
+            dropped.push(item.id);
+          }
+        }
+
+        // One line per relation, not per entry. The entry count is chosen by whoever
+        // owns the DID and there is no cache in front of this, so a per-entry warn
+        // would let anyone multiply the log volume of a host running this driver by
+        // however many entries they cared to write.
+        if (dropped.length > 0) {
+          console.warn(
+            `Dropping ${dropped.length} ${relation} ${dropped.length === 1 ? 'entry' : 'entries'} (${dropped.slice(0, 5).join(', ')}${dropped.length > 5 ? ', …' : ''}): no uri, so as of the current schema the on-chain value was an inline verification method, which did:xny does not express in a relationship`
+          );
+        }
 
         // Omitted rather than emitted empty when nothing survives: a DID with no
         // usable entry for a relationship is a DID that does not have it.

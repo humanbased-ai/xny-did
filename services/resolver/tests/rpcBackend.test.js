@@ -502,8 +502,18 @@ test('an inline verification method in a relationship is dropped, not rendered a
 });
 
 test('a relationship whose every entry is inline is omitted, not emitted empty', async () => {
+  const inline = '{"type":"Ed25519VerificationKey2020"}';
+
+  // Anchor first: the backend really does hand assembly one entry with a null uri.
+  // Without this the assertion below would keep passing if a future tightening of
+  // isStorableMethod stopped the entry being created at all — testing nothing.
+  const shape = toDidDocumentShape(DID, OWNER, [DID], [
+    attribute('authentication', [item(inline)]),
+  ]);
+  assert.deepEqual(shape.authentication, [{ id: `${DID}#auth_0`, uri: null }]);
+
   const backend = backendReturning(OWNER, [], [
-    attribute('authentication', [item('{"type":"Ed25519VerificationKey2020"}')]),
+    attribute('authentication', [item(inline)]),
     attribute('assertionMethod', [item('0')]),
   ]);
   const doc = await new Resolver(backend).resolve(DID);
@@ -511,6 +521,37 @@ test('a relationship whose every entry is inline is omitted, not emitted empty',
   assert.ok(!('authentication' in doc), JSON.stringify(doc.authentication));
   // The relationship that does have a usable entry is untouched.
   assert.deepEqual(doc.assertionMethod, [`${DID}#vm_0`]);
+});
+
+test('dropped entries are reported once per relation, naming them', async () => {
+  // The point of logging at all is that an operator who wrote an inline entry can
+  // find out why it is missing, so the entity id has to be in the message. One line
+  // per relation rather than per entry, because the count is the operator's to choose.
+  const inline = '{"type":"Ed25519VerificationKey2020"}';
+  const backend = backendReturning(OWNER, [], [
+    attribute('authentication', Array.from({ length: 20 }, () => item(inline))),
+    attribute('keyAgreement', [item(inline)]),
+  ]);
+
+  const lines = [];
+  const original = console.warn;
+  console.warn = (line) => lines.push(line);
+  try {
+    await new Resolver(backend).resolve(DID);
+  } finally {
+    console.warn = original;
+  }
+
+  assert.equal(lines.length, 2, lines.join('\n'));
+  const authentication = lines.find((l) => l.includes('authentication'));
+  assert.match(authentication, /Dropping 20 authentication entries/);
+  assert.ok(authentication.includes(`${DID}#auth_0`), authentication);
+  // Truncated rather than listing all twenty.
+  assert.ok(authentication.includes('…'), authentication);
+
+  const keyAgreement = lines.find((l) => l.includes('keyAgreement'));
+  assert.match(keyAgreement, /Dropping 1 keyAgreement entry/);
+  assert.ok(keyAgreement.includes(`${DID}#ka_0`), keyAgreement);
 });
 
 test('rpc transport failure -> 500 internalError', async () => {
