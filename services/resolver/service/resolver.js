@@ -138,8 +138,34 @@ class Resolver {
       ];
 
       for (const relation of relations) {
-        if (didDoc[relation] && didDoc[relation].length > 0) {
-          document[relation] = didDoc[relation].map((item) => item.uri);
+        // An entry whose on-chain value was a JSON object has no uri: the indexer
+        // turns it into an embedded method and leaves uri null
+        // (arrayAttributeHandler.ts:206), and the query does not select the method.
+        // Mapping those straight through emitted `[null]`, which DID Core admits
+        // nowhere — an entry has to be a DID URL string or a verification method
+        // map, so a consumer either fails to parse the document or discards the
+        // whole relationship.
+        //
+        // Dropped rather than rendered, because this method does not embed inline
+        // verification methods in a relationship (docs/xny-did-method.md:138-142) —
+        // the value is out of spec at rest, and nothing usable is lost by leaving it
+        // out. Logged so that it is not lost silently.
+        const references = (didDoc[relation] || [])
+          .filter((item) => {
+            if (item.uri) {
+              return true;
+            }
+            console.warn(
+              `Dropping ${relation} entry ${item.id}: no uri, so its on-chain value was an inline verification method, which did:xny does not express in a relationship`
+            );
+            return false;
+          })
+          .map((item) => item.uri);
+
+        // Omitted rather than emitted empty when nothing survives: a DID with no
+        // usable entry for a relationship is a DID that does not have it.
+        if (references.length > 0) {
+          document[relation] = references;
         }
       }
 

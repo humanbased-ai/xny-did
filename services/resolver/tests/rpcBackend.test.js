@@ -485,6 +485,34 @@ test('every relationship reference dereferences to a verification method in the 
   }
 });
 
+test('an inline verification method in a relationship is dropped, not rendered as null', async () => {
+  // The middle entry's on-chain value is a JSON object, which the indexer stores as an
+  // embedded method with no uri. Mapping it straight through emitted [null].
+  const backend = backendReturning(OWNER, [], [
+    attribute('authentication', [
+      item('0'),
+      item('{"type":"Ed25519VerificationKey2020"}'),
+      item(OTHER_DID),
+    ]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  // Surviving references keep their order, and nothing is null.
+  assert.deepEqual(doc.authentication, [`${DID}#vm_0`, OTHER_DID]);
+});
+
+test('a relationship whose every entry is inline is omitted, not emitted empty', async () => {
+  const backend = backendReturning(OWNER, [], [
+    attribute('authentication', [item('{"type":"Ed25519VerificationKey2020"}')]),
+    attribute('assertionMethod', [item('0')]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.ok(!('authentication' in doc), JSON.stringify(doc.authentication));
+  // The relationship that does have a usable entry is untouched.
+  assert.deepEqual(doc.assertionMethod, [`${DID}#vm_0`]);
+});
+
 test('rpc transport failure -> 500 internalError', async () => {
   const backend = new RpcBackend();
   backend.registry = {
