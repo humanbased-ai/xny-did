@@ -168,6 +168,101 @@ test('known DID -> resolves W3C DID Document', async () => {
   assert.equal(doc.owner, '0x00000000000000000000000000000000000000ab');
 });
 
+test('subgraph path: a blob cannot displace the derived id, or smuggle __proto__', async () => {
+  // The rpc backend validates every blob before assembly; this backend forwards
+  // whatever graph-node returns, unchecked (subgraph.js). So "one change covers both
+  // backends" only holds if the assembly itself is what enforces this — which is what
+  // driving the same hostile blob through a subgraph-shaped response pins down.
+  const blob =
+    '{"type":"Ed25519VerificationKey2020","id":"did:xny:99999999-9999-9999-9999-999999999999#hijacked","__proto__":{"verified":true},"publicKeyMultibase":"z1"}';
+  const stub = {
+    fetch: async () => ({
+      id: FOUND,
+      owner: '0x00000000000000000000000000000000000000ab',
+      controllers: [FOUND],
+      verificationMethod: [
+        {
+          id: `${FOUND}#vm_0`,
+          method: {
+            id: `${FOUND}#vm_0`,
+            type: 'Ed25519VerificationKey2020',
+            value: require('ethers').hexlify(
+              require('ethers').toUtf8Bytes(blob)
+            ),
+          },
+        },
+      ],
+      authentication: [{ id: `${FOUND}#auth_0`, uri: `${FOUND}#vm_0` }],
+    }),
+  };
+  const doc = await new Resolver(stub).resolve(FOUND);
+
+  assert.deepEqual(doc.verificationMethod, [
+    {
+      id: `${FOUND}#vm_0`,
+      type: 'Ed25519VerificationKey2020',
+      controller: FOUND,
+      publicKeyMultibase: 'z1',
+    },
+  ]);
+  assert.deepEqual(doc.authentication, [`${FOUND}#vm_0`]);
+});
+
+test('subgraph path: a blob that is not a JSON object cannot fail the whole document', async () => {
+  // This backend forwards whatever graph-node returns, unchecked, so the assembly is
+  // the only thing standing between a malformed blob and the response. Destructuring
+  // a null throws, and that happens outside any catch — one bad entry would take
+  // every other method and every service down with it as a 500. A string would
+  // instead spread its character indices in as fields.
+  const ethers = require('ethers');
+  for (const value of ['null', '"hi"', '[1,2]', '42']) {
+    const stub = {
+      fetch: async () => ({
+        id: FOUND,
+        owner: '0x00000000000000000000000000000000000000ab',
+        controllers: [FOUND],
+        verificationMethod: [
+          {
+            id: `${FOUND}#vm_0`,
+            method: {
+              id: `${FOUND}#vm_0`,
+              type: 'Ed25519VerificationKey2020',
+              value: ethers.hexlify(ethers.toUtf8Bytes(value)),
+            },
+          },
+        ],
+        service: [
+          {
+            id: `${FOUND}#service_0`,
+            type: 'LinkedDomains',
+            serviceEndpoint: storedService({
+              type: 'LinkedDomains',
+              serviceEndpoint: 'https://xny.ai',
+            }),
+          },
+        ],
+      }),
+    };
+    const doc = await new Resolver(stub).resolve(FOUND);
+
+    // The method keeps the fields the resolver derives and gains nothing from the
+    // blob — no character-index fields, no crash.
+    assert.deepEqual(
+      doc.verificationMethod,
+      [
+        {
+          id: `${FOUND}#vm_0`,
+          type: 'Ed25519VerificationKey2020',
+          controller: FOUND,
+        },
+      ],
+      value
+    );
+    // And the rest of the document survived.
+    assert.equal(doc.service.length, 1, value);
+  }
+});
+
 test('service: the endpoint is served as written, not as the stored bytes', async () => {
   const doc = await resolver.resolve(WITH_SERVICE);
   assert.deepEqual(doc.service[0], {

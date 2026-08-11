@@ -1,7 +1,7 @@
 const ethers = require('ethers');
 const config = require('config');
 const { ResolveError } = require('./resolveError');
-const { bytesToString } = require('./bytes');
+const { bytesToString, parseJsonObject } = require('./bytes');
 const { SubgraphBackend, DEFAULT_TIMEOUT_MS } = require('./backends/subgraph');
 const { RpcBackend } = require('./backends/rpc');
 
@@ -80,19 +80,51 @@ class Resolver {
 
       if (didDoc.verificationMethod) {
         document.verificationMethod = didDoc.verificationMethod.map((vm) => {
-          let methodDetails = {};
-          try {
-            if (vm.method.value && vm.method.value.startsWith('0x')) {
-              methodDetails = JSON.parse(ethers.toUtf8String(vm.method.value));
-            }
-          } catch (e) {
-            console.warn('Error decoding verification method value', e);
-          }
+          // The same decode the rpc backend validated this blob with, and the same
+          // object-or-nothing verdict. Decoding strictly here rejected bytes the
+          // backend had accepted, which used to be swallowed into a method with no
+          // key material at all; and anything that is not a JSON object cannot
+          // contribute fields — a string would spread its indices in as fields, and
+          // a null would throw in the destructure below, which sits outside any
+          // catch and so would fail the whole document over one entry.
+          const methodDetails = parseJsonObject(vm.method.value) || {};
+
+          // Discard the blob's attempts at the fields the resolver is responsible
+          // for, and spread what remains: key material and method-specific fields
+          // still come through, which is the point of the spread.
+          //
+          // These used to be assigned before the spread, so a blob carrying its own
+          // `id` displaced the `#vm_<index>` name derived from the array position —
+          // and every relationship entry pointing at that name was then left
+          // dereferencing nothing. `authentication` would name `#vm_0` while the
+          // only method in the document called itself something else, so the DID
+          // could not be used to authenticate at all. The id it supplied could also
+          // name a fragment of a DID it does not control.
+          //
+          // `__proto__` is dropped for a different reason: it is inert inside this
+          // process (JSON.parse and spread both create a plain own property) but
+          // serializing it hands every downstream consumer a prototype-pollution
+          // gadget — an ordinary `Object.assign` into a record replaces that
+          // record's prototype, and a hand-rolled recursive merge pollutes
+          // `Object.prototype` process-wide. `constructor` is inert under spread and
+          // goes with it. `type` cannot actually be displaced — the derived value is
+          // read from this very blob — and is named for symmetry.
+          //
+          // Naming these rather than relying on spread order both says what is being
+          // dropped and keeps the field order the document has always had.
+          const {
+            id,
+            type,
+            controller,
+            __proto__: _proto,
+            constructor: _constructor,
+            ...methodFields
+          } = methodDetails;
           return {
             id: vm.id,
             type: vm.method.type,
             controller: didDoc.id,
-            ...methodDetails,
+            ...methodFields,
           };
         });
       }

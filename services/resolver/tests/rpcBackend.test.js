@@ -342,8 +342,147 @@ test('a service blob with invalid UTF-8 does not 500 the whole document', async 
   const doc = await new Resolver(backend).resolve(DID);
 
   assert.equal(doc.service.length, 1);
-  // U+FFFD where the bad byte was, which is what the indexer would have stored too.
+  // U+FFFD where the bad byte was. Whether the indexer would have stored this entry
+  // at all is a separate, unsettled question — see IN-3167.
   assert.equal(doc.service[0].serviceEndpoint, 'https://xny.ai/�');
+});
+
+// A blob's controller only reaches assembly when it is an integer or an all-digits
+// string — isStorableMethod drops a DID-string one, matching addSingleMethod. So the
+// undefined case and the numeric ones are the reachable set, and the numeric ones are
+// what used to be emitted verbatim as `controller: 42`, which is not a DID at all.
+for (const [label, controller] of [
+  ['no controller', undefined],
+  ['an integer controller', 42],
+  ['a numeric-string controller', '42'],
+]) {
+  test(`a blob with ${label} cannot displace the id or controller`, async () => {
+    const blob = {
+      type: 'Ed25519VerificationKey2020',
+      id: `${OTHER_DID}#hijacked`,
+      publicKeyMultibase: 'z6MkAttackerKey',
+    };
+    if (controller !== undefined) {
+      blob.controller = controller;
+    }
+    const backend = backendReturning(OWNER, [], [
+      attribute('verificationMethod', [item(JSON.stringify(blob))]),
+    ]);
+    const doc = await new Resolver(backend).resolve(DID);
+
+    assert.deepEqual(doc.verificationMethod, [
+      {
+        id: `${DID}#vm_0`,
+        type: 'Ed25519VerificationKey2020',
+        controller: DID,
+        // Key material the operator supplied still comes through — that is what the
+        // spread is for.
+        publicKeyMultibase: 'z6MkAttackerKey',
+      },
+    ]);
+  });
+}
+
+test('a blob cannot smuggle __proto__ into the served document', async () => {
+  // Inert inside this process, but serializing it hands every downstream consumer a
+  // prototype-pollution gadget: an Object.assign into a record replaces that record's
+  // prototype, and a hand-rolled recursive merge reaches Object.prototype itself.
+  const blob =
+    '{"type":"Ed25519VerificationKey2020","__proto__":{"verified":true},"constructor":{"x":1},"publicKeyMultibase":"z1"}';
+  const backend = backendReturning(OWNER, [], [
+    attribute('verificationMethod', [item(blob)]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  const served = JSON.stringify(doc.verificationMethod[0]);
+  assert.ok(!served.includes('__proto__'), served);
+  assert.ok(!served.includes('constructor'), served);
+  // The legitimate field is untouched.
+  assert.equal(doc.verificationMethod[0].publicKeyMultibase, 'z1');
+  // And a downstream merge of the served document stays clean.
+  const merged = Object.assign({}, JSON.parse(served));
+  assert.equal(Object.getPrototypeOf(merged), Object.prototype);
+  assert.equal(merged.verified, undefined);
+});
+
+test('the rpc backend drops a blob that is not a JSON object before assembly ever sees it', async () => {
+  // The assembly is guarded too — tests/resolver.test.js drives these through the
+  // subgraph path, which forwards unchecked — but this is the layer that keeps them
+  // from arriving in the first place.
+  for (const value of ['null', '"hi"', '[1,2]', '42']) {
+    const backend = backendReturning(OWNER, [], [
+      attribute('verificationMethod', [item(value)]),
+    ]);
+    const doc = await new Resolver(backend).resolve(DID);
+    assert.deepEqual(doc.verificationMethod, [], value);
+  }
+});
+
+test('a verification method with an invalid UTF-8 byte keeps its key material', async () => {
+  // The backend decodes leniently to match graph-ts and keeps this entry. A strict
+  // decode during assembly threw on the same bytes, the catch swallowed it, and the
+  // method was emitted with no key material — a verification method that cannot
+  // verify anything, silently.
+  const good = Buffer.from(
+    JSON.stringify({
+      type: 'Ed25519VerificationKey2020',
+      publicKeyMultibase: 'z6MkRealKey',
+    }),
+    'utf8'
+  );
+  const withBadByte = Buffer.concat([
+    good.subarray(0, good.length - 2),
+    Buffer.from([0xff]),
+    good.subarray(good.length - 2),
+  ]);
+
+  const backend = backendReturning(OWNER, [], [
+    {
+      name: 'verificationMethod',
+      values: [{ value: '0x' + withBadByte.toString('hex'), revoked: false }],
+    },
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.equal(doc.verificationMethod.length, 1);
+  // U+FFFD where the bad byte was. Whether the indexer would have stored this entry
+  // at all is a separate, unsettled question — see IN-3167; what this pins is only
+  // that the backend and the assembly reach the same verdict about the same bytes.
+  assert.equal(doc.verificationMethod[0].publicKeyMultibase, 'z6MkRealKey�');
+});
+
+test('every relationship reference dereferences to a verification method in the document', async () => {
+  // The harm the id displacement caused, stated as the property that has to hold:
+  // authentication names a method by id, and a verifier has to be able to find it.
+  const backend = backendReturning(OWNER, [], [
+    attribute('verificationMethod', [
+      item(
+        JSON.stringify({
+          type: 'Ed25519VerificationKey2020',
+          id: `${OTHER_DID}#hijacked`,
+          publicKeyMultibase: 'z6Mk',
+        })
+      ),
+    ]),
+    attribute('authentication', [item('0')]),
+    attribute('assertionMethod', [item('0')]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  // Anchor the quantifier: without these the property holds vacuously over an empty
+  // relation array, so a regression that stopped emitting relations would pass.
+  assert.equal(doc.verificationMethod.length, 1);
+
+  const known = new Set(doc.verificationMethod.map((vm) => vm.id));
+  for (const relation of ['authentication', 'assertionMethod']) {
+    assert.equal(doc[relation].length, 1);
+    for (const reference of doc[relation]) {
+      assert.ok(
+        known.has(reference),
+        `${relation} names ${reference}, which is not in verificationMethod`
+      );
+    }
+  }
 });
 
 test('rpc transport failure -> 500 internalError', async () => {

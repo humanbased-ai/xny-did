@@ -2,10 +2,9 @@
 
 const ethers = require('ethers');
 const { DEFAULT_TIMEOUT_MS } = require('./subgraph');
-// graph-ts' Bytes.toString() decodes UTF-8 leniently, so this substitutes rather than
-// rejecting. Shared with the document assembly, which decodes service values a second
+// Shared with the document assembly, which decodes some of the same bytes a second
 // time and has to reach the same verdict — see service/bytes.js.
-const { bytesToString } = require('../bytes');
+const { bytesToString, parseJsonObject } = require('../bytes');
 
 // Base mainnet is the authoritative deployment for did:xny (see docs/xny-did-method.md),
 // and both of these are public: the endpoint takes no API key and the address is the
@@ -41,18 +40,6 @@ function didToUint128(identifier) {
 function uint128ToDID(value) {
   const hex = value.toString(16).padStart(32, '0');
   return `did:xny:${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
-}
-
-function parseJsonObject(hexValue) {
-  let parsed;
-  try {
-    parsed = JSON.parse(bytesToString(hexValue));
-  } catch (e) {
-    return null;
-  }
-  return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
-    ? parsed
-    : null;
 }
 
 // addSingleMethod (arrayAttributeHandler.ts:82-118) refuses to create an entity unless
