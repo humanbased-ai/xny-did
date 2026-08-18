@@ -8,7 +8,7 @@
 # humanbased-ai/xny-monorepo. That pipeline applies without --prune, so the two
 # sets coexist without either removing the other's resources.
 #
-# Served publicly at https://did.staging.xnyscan.com via the Ingress at the
+# Served publicly at https://resolver.did.staging.xny.ai via the Ingress at the
 # bottom of this file. Note that the DIF Universal Resolver does not consume that
 # URL — it runs our image on its own machines — so the endpoint exists for our own
 # callers, and is unauthenticated, uncached and unthrottled.
@@ -133,18 +133,28 @@ spec:
       protocol: TCP
 ---
 # Google-managed certificate. It stays in Provisioning (often reported as
-# FailedNotVisible) until did.staging.xnyscan.com resolves to the load balancer
-# the Ingress below creates — which cannot happen before that Ingress exists. So
-# the first apply is expected to leave this pending; it goes Active 15-60 minutes
-# after the DNS record is added, and renews itself from then on.
+# FailedNotVisible) until resolver.did.staging.xny.ai resolves to the load
+# balancer the Ingress below creates — which cannot happen before that Ingress
+# exists. So the first apply is expected to leave this pending; it goes Active
+# 15-60 minutes after the DNS record is added, and renews itself from then on.
+#
+# That record has to be DNS-only in Cloudflare. Proxied, Google's domain
+# validation never reaches the load balancer and provisioning stays
+# FailedNotVisible indefinitely rather than failing outright.
+#
+# The -v2 suffix is load-bearing. A ManagedCertificate's spec.domains cannot be
+# changed in place — the Google SSL certificate resource behind it is immutable,
+# and the API accepts the edit without the controller reissuing anything. A new
+# name is what makes apply create a fresh certificate instead of mutating
+# did-resolver-cert, which still carries the old xnyscan.com domain.
 apiVersion: networking.gke.io/v1
 kind: ManagedCertificate
 metadata:
-  name: did-resolver-cert
+  name: did-resolver-cert-v2
   namespace: xny-staging
 spec:
   domains:
-    - did.staging.xnyscan.com
+    - resolver.did.staging.xny.ai
 ---
 # Provisions an external HTTP(S) load balancer. Its backend health check is
 # derived from the pod's readinessProbe, i.e. /ready — which is why that endpoint
@@ -174,10 +184,10 @@ metadata:
     # spec.ingressClassName empty, even though its stored manifest says otherwise;
     # it was converted when it was created and ours was not.
     kubernetes.io/ingress.class: gce
-    networking.gke.io/managed-certificates: did-resolver-cert
+    networking.gke.io/managed-certificates: did-resolver-cert-v2
 spec:
   rules:
-    - host: did.staging.xnyscan.com
+    - host: resolver.did.staging.xny.ai
       http:
         paths:
           # `/*` with ImplementationSpecific is what the GCE ingress controller
