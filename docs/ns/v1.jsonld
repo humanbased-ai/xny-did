@@ -1,0 +1,54 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+
+    "owner": {
+      "@id": "https://w3id.org/xny#owner"
+    },
+
+    "EmailChallenge": {
+      "@id": "https://w3id.org/xny#EmailChallenge",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "emailAddress": {
+          "@id": "https://w3id.org/xny#emailAddress"
+        }
+      }
+    },
+
+    "GoogleAuth": {
+      "@id": "https://w3id.org/xny#GoogleAuth",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "googleOpenID": {
+          "@id": "https://w3id.org/xny#googleOpenID"
+        }
+      }
+    },
+
+    "EthereumAddress": {
+      "@id": "https://w3id.org/xny#EthereumAddress",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "ethereumAddress": {
+          "@id": "https://w3id.org/xny#ethereumAddress"
+        }
+      }
+    },
+
+    "TonAddress": {
+      "@id": "https://w3id.org/xny#TonAddress",
+      "@context": {
+        "@version": 1.1,
+        "@protected": true,
+        "tonAddress": {
+          "@id": "https://w3id.org/xny#tonAddress"
+        }
+      }
+    }
+  }
+}
