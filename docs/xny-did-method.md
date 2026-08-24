@@ -146,11 +146,21 @@ relationship.
 > custom `verificationMethod.type` values defined in
 > [Verification Methods](#verification-methods) (`EmailChallenge`, `GoogleAuth`,
 > `EthereumAddress`, `TonAddress`) and their value fields (`emailAddress`,
-> `googleOpenID`, `ethereumAddress`, `tonAddress`) are method-specific. The
-> `@context` shown below includes only `https://www.w3.org/ns/did/v1`, under
-> which these terms are undefined; a deployment that needs the document to be
-> valid JSON-LD **SHOULD** also include a method-specific `@context` that defines
-> them.
+> `googleOpenID`, `ethereumAddress`, `tonAddress`) are method-specific. These
+> nine terms are undefined under `https://www.w3.org/ns/did/v1` alone, so a
+> JSON-LD processor given only that context discards every one of them. A
+> document represented as `application/did+ld+json` therefore **MUST** also
+> include the method-specific context
+> [`https://w3id.org/xny/v1`](https://w3id.org/xny/v1), which defines them.
+
+The context defines the four verification method types as type-scoped contexts,
+so each value field is defined only within its own method type: `emailAddress`
+is meaningful inside an `EmailChallenge` entry and undefined elsewhere. Terms are
+`@protected`, so a downstream context cannot redefine them.
+
+Versioning: `https://w3id.org/xny/v1` is immutable. Terms may be added in a later
+version, but an existing term's IRI or definition will never change under a
+published version URL; a breaking change gets a new URL.
 
 ### Example
 
@@ -161,7 +171,10 @@ salted hashes).
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/did/v1"],
+  "@context": [
+    "https://www.w3.org/ns/did/v1",
+    "https://w3id.org/xny/v1"
+  ],
   "id": "did:xny:95228308-9d75-4dd8-8958-2713b92d3d71",
   "owner": "0x1234567890abcdef1234567890abcdef12345678",
   "controller": ["did:xny:95228308-9d75-4dd8-8958-2713b92d3d71"],
@@ -199,13 +212,15 @@ as follows:
 
 - `controller` is always an array (DID Core also permits a single string).
 - `owner` is a method-specific extension property; it is not defined by DID Core.
+  It is defined by [`https://w3id.org/xny/v1`](https://w3id.org/xny/v1).
 - Verification relationships (`authentication`, `assertionMethod`,
   `keyAgreement`, `capabilityInvocation`, `capabilityDelegation`) contain only
   references to `verificationMethod` entries; inline verification methods are not
   used (DID Core permits inline definitions).
 - The custom `verificationMethod.type` values defined in
-  [Verification Methods](#verification-methods) are method-specific and require a
-  method-specific `@context` to be valid JSON-LD.
+  [Verification Methods](#verification-methods) are method-specific and are
+  defined by [`https://w3id.org/xny/v1`](https://w3id.org/xny/v1), which a
+  `did+ld+json` representation must include alongside the DID Core context.
 - Deactivation is not currently supported (see [Deactivate](#deactivate)).
 
 ## Verification Methods
