@@ -1,7 +1,7 @@
 const ethers = require('ethers');
 const config = require('config');
 const { ResolveError } = require('./resolveError');
-const { bytesToString, parseJsonObject } = require('./bytes');
+const { parseJsonObject } = require('./bytes');
 const { SubgraphBackend, DEFAULT_TIMEOUT_MS } = require('./backends/subgraph');
 const { RpcBackend } = require('./backends/rpc');
 
@@ -197,18 +197,17 @@ class Resolver {
         // parsed object, so `id` stays `<did>#service_<index>` and an operator
         // cannot displace it.
         //
-        // No fallback on the parse: a service entry only reaches this point once
-        // it has already been parsed once — by the indexer before it created the
-        // entity, or by the rpc backend before it appended the entry.
-        // bytesToString, not ethers' default: the rpc backend proved this blob
-        // parseable using the lenient decode, and a strict one here would reject
-        // bytes it accepted — turning one operator's malformed service entry into
-        // a 500 for the whole document.
+        // parseJsonObject rather than a bare JSON.parse, so a blob that does not
+        // decode or does not parse yields undefined and is dropped by the filter
+        // below instead of throwing a 500 for the whole document over one entry.
+        // Nothing reachable should need that: an entry only gets here once the
+        // same decoder has already accepted it — by the indexer before it created
+        // the entity, or by the rpc backend before it appended the entry.
         document.service = didDoc.service
           .map((svc) => ({
             id: svc.id,
             type: svc.type,
-            serviceEndpoint: JSON.parse(bytesToString(svc.serviceEndpoint))
+            serviceEndpoint: (parseJsonObject(svc.serviceEndpoint) || {})
               .serviceEndpoint,
           }))
           // The indexer only checks that a serviceEndpoint key exists, so null,
