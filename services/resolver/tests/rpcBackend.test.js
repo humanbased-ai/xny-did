@@ -321,11 +321,12 @@ test('end to end: services decode to the same documents as the subgraph path', a
   ]);
 });
 
-test('a service blob with invalid UTF-8 does not 500 the whole document', async () => {
-  // The backend decodes leniently to match graph-ts, so it keeps this entry. If the
-  // assembly decoded strictly it would throw on the same bytes, and the catch in
-  // resolve() would turn one operator's malformed entry into a 500 for every DID
-  // that has one.
+test('a service blob with invalid UTF-8 is dropped, as the indexer drops it', async () => {
+  // The indexer parses service blobs with json.try_fromBytes, which rejects malformed
+  // UTF-8 outright rather than substituting — measured against graph-node in
+  // services/indexer/tests/utf8.test.ts. It creates no Service entity, so the subgraph
+  // backend has nothing to return. The rpc backend has to reach the same verdict or
+  // the two backends disagree about the same DID.
   const good = Buffer.from(
     JSON.stringify({ type: 'LinkedDomains', serviceEndpoint: 'https://xny.ai/' }),
     'utf8'
@@ -344,10 +345,55 @@ test('a service blob with invalid UTF-8 does not 500 the whole document', async 
   ]);
   const doc = await new Resolver(backend).resolve(DID);
 
-  assert.equal(doc.service.length, 1);
-  // U+FFFD where the bad byte was. Whether the indexer would have stored this entry
-  // at all is a separate, unsettled question — see IN-3167.
-  assert.equal(doc.service[0].serviceEndpoint, 'https://xny.ai/�');
+  assert.deepEqual(doc.service, []);
+  // And the document as a whole still resolves: one operator's malformed entry must
+  // cost that entry, not a 500 for every DID that has one.
+  assert.equal(doc.id, DID);
+});
+
+test('one malformed service entry does not take a valid sibling with it', async () => {
+  // Guards the drop against being implemented as "abandon the service array".
+  const bad = Buffer.from(
+    JSON.stringify({ type: 'LinkedDomains', serviceEndpoint: 'https://xny.ai/x' }),
+    'utf8'
+  );
+  const withBadByte = Buffer.concat([
+    bad.subarray(0, bad.length - 2),
+    Buffer.from([0xff]),
+    bad.subarray(bad.length - 2),
+  ]);
+
+  const backend = backendReturning(OWNER, [], [
+    {
+      name: 'service',
+      values: [
+        { value: '0x' + withBadByte.toString('hex'), revoked: false },
+        {
+          value:
+            '0x' +
+            Buffer.from(
+              JSON.stringify({
+                type: 'LinkedDomains',
+                serviceEndpoint: 'https://xny.ai/ok',
+              }),
+              'utf8'
+            ).toString('hex'),
+          revoked: false,
+        },
+      ],
+    },
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.deepEqual(doc.service, [
+    {
+      // index 1, not 0: the dropped entry still consumed its on-chain index, exactly
+      // as a revoked one does, so the surviving entry keeps the id it has on-chain.
+      id: `${DID}#service_1`,
+      type: 'LinkedDomains',
+      serviceEndpoint: 'https://xny.ai/ok',
+    },
+  ]);
 });
 
 // A blob's controller only reaches assembly when it is an integer or an all-digits
@@ -421,11 +467,12 @@ test('the rpc backend drops a blob that is not a JSON object before assembly eve
   }
 });
 
-test('a verification method with an invalid UTF-8 byte keeps its key material', async () => {
-  // The backend decodes leniently to match graph-ts and keeps this entry. A strict
-  // decode during assembly threw on the same bytes, the catch swallowed it, and the
-  // method was emitted with no key material — a verification method that cannot
-  // verify anything, silently.
+test('a verification method with an invalid UTF-8 byte is dropped, not served keyless', async () => {
+  // Two wrong answers were possible here and both were reachable at some point: serve
+  // the method with U+FFFD substituted into its key material, or serve it with the key
+  // material missing entirely — a verification method that cannot verify anything.
+  // The right answer is neither. The indexer's json.try_fromBytes rejects these bytes
+  // and no VerificationMethod entity is created, so the entry must not exist.
   const good = Buffer.from(
     JSON.stringify({
       type: 'Ed25519VerificationKey2020',
@@ -447,11 +494,28 @@ test('a verification method with an invalid UTF-8 byte keeps its key material', 
   ]);
   const doc = await new Resolver(backend).resolve(DID);
 
-  assert.equal(doc.verificationMethod.length, 1);
-  // U+FFFD where the bad byte was. Whether the indexer would have stored this entry
-  // at all is a separate, unsettled question — see IN-3167; what this pins is only
-  // that the backend and the assembly reach the same verdict about the same bytes.
-  assert.equal(doc.verificationMethod[0].publicKeyMultibase, 'z6MkRealKey�');
+  assert.deepEqual(doc.verificationMethod, []);
+  assert.equal(doc.id, DID);
+});
+
+test('an overlong encoding is not decoded into the codepoint it spells', async () => {
+  // 0xc0 0xaf is an illegal second spelling of '/'. ethers' lenient decoder emits a
+  // real '/' for it, which would make an alsoKnownAs value indistinguishable from one
+  // an operator actually wrote — and would disagree with the subgraph, where
+  // Bytes.toString() yields two replacement characters instead
+  // (services/indexer/tests/utf8.test.ts).
+  const backend = backendReturning(OWNER, [], [
+    {
+      name: 'alsoKnownAs',
+      values: [
+        { value: '0x' + Buffer.from([0x61, 0xc0, 0xaf, 0x62]).toString('hex'), revoked: false },
+      ],
+    },
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.deepEqual(doc.alsoKnownAs, ['a��b']);
+  assert.notEqual(doc.alsoKnownAs[0], 'a/b');
 });
 
 test('every relationship reference dereferences to a verification method in the document', async () => {
