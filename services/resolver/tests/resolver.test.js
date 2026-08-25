@@ -19,6 +19,18 @@ const controllers = require('../controllers/Default');
 const RESOLUTION_PROFILE =
   'application/ld+json;profile="https://w3id.org/did-resolution"';
 
+// The context this repo publishes, read off disk rather than over the network:
+// https://w3id.org/xny/v1 is a redirect to exactly this file, so the shipped copy is
+// what a client resolving the emitted URL ends up with.
+function shippedContext() {
+  return JSON.parse(
+    require('fs').readFileSync(
+      require('path').join(__dirname, '../../../docs/ns/v1.jsonld'),
+      'utf8'
+    )
+  )['@context'];
+}
+
 // Valid-layout did:xny identifiers used to steer the mock subgraph.
 const FOUND = 'did:xny:11111111-1111-1111-1111-111111111111';
 const NOT_FOUND = 'did:xny:22222222-2222-2222-2222-222222222222';
@@ -162,8 +174,16 @@ test('subgraph error -> 500 internalError', async () => {
 
 test('known DID -> resolves W3C DID Document', async () => {
   const doc = await resolver.resolve(FOUND);
-  assert.deepEqual(doc['@context'], ['https://www.w3.org/ns/did/v1']);
+  // Order matters: DID Core requires the DID context first.
+  assert.deepEqual(doc['@context'], [
+    'https://www.w3.org/ns/did/v1',
+    'https://w3id.org/xny/v1',
+  ]);
   assert.equal(doc.id, FOUND);
+  // Emitting the URL is only half of it — the document has to actually be covered
+  // by what that URL serves. `owner` is on every document this resolver produces,
+  // and under the DID Core context alone a JSON-LD processor discards it silently.
+  assert.ok(shippedContext().owner, 'the method context must define owner');
   assert.deepEqual(doc.controller, [FOUND]);
   assert.equal(doc.owner, '0x00000000000000000000000000000000000000ab');
 });
