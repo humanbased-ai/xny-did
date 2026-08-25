@@ -273,7 +273,10 @@ test('end to end through Resolver: rpc backend produces a W3C DID Document', asy
   ]);
   const doc = await new Resolver(backend).resolve(DID);
 
-  assert.deepEqual(doc['@context'], ['https://www.w3.org/ns/did/v1']);
+  assert.deepEqual(doc['@context'], [
+    'https://www.w3.org/ns/did/v1',
+    'https://w3id.org/xny/v1',
+  ]);
   assert.equal(doc.id, DID);
   assert.deepEqual(doc.controller, [DID, OTHER_DID]);
   assert.equal(doc.owner, OWNER);

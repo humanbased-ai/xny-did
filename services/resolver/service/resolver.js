@@ -68,7 +68,14 @@ class Resolver {
       }
 
       const document = {
-        '@context': ['https://www.w3.org/ns/did/v1'],
+        // Both, always. `owner` is on every document this method produces, and it
+        // and the method-specific verification method types are undefined under the
+        // DID Core context alone — a JSON-LD processor given only that one discards
+        // them without complaint, which is how a document can parse cleanly and
+        // still mean less than it says. The method context defines them.
+        // Hardcoded because a document's context follows from the method, not from
+        // anything on-chain; see docs/xny-did-method.md.
+        '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/xny/v1'],
         id: didDoc.id,
         controller: didDoc.controllers,
         owner: didDoc.owner,
