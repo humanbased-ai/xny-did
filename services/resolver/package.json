@@ -1,6 +1,6 @@
 {
   "name": "xny-did-resolver",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The Xny DID Resolver Driver",
   "main": "index.js",
   "scripts": {
