@@ -358,7 +358,9 @@ test('service: endpoints DID Core does not admit are dropped', async () => {
       }),
     };
     const doc = await new Resolver(stub).resolve(FOUND);
-    assert.deepEqual(doc.service, [], `${label} should have been dropped`);
+    // Omitted, not emitted empty: this DID does have a service entry on-chain, but
+    // none a client could dial, and that has to read the same as having none.
+    assert.ok(!('service' in doc), `${label} should have been dropped`);
   }
 });
 

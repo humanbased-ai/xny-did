@@ -192,6 +192,34 @@ test('alsoKnownAs with every item revoked is an empty list, not null', () => {
   assert.deepEqual(doc.alsoKnownAs, []);
 });
 
+// The backend shape above and the served document below deliberately differ. The
+// backend keeps [] because that is the shape the subgraph also returns, and the two
+// have to be indistinguishable. The document omits, because that is the only rule
+// that can cover all of the list-valued properties at once: DID Core requires a
+// verification relationship to be "a set of one or more", so those five cannot be
+// [] at all, while "if present" in front of every definition makes omitting legal
+// everywhere.
+test('a DID with nothing on it omits every empty list rather than emitting []', async () => {
+  const doc = await new Resolver(backendReturning(OWNER, [], [])).resolve(DID);
+
+  // The exact key set, not a per-property check, so that a list-valued property
+  // added later cannot quietly start emitting [] without failing here.
+  assert.deepEqual(Object.keys(doc), ['@context', 'id', 'controller', 'owner']);
+});
+
+test('alsoKnownAs that existed and was fully revoked is omitted too', async () => {
+  // The one case where the document loses a distinction the backend keeps: never
+  // had an alias (null) and had one that was revoked ([]) both read as absent. A
+  // consumer cannot act on the difference — an empty set of aliases is no aliases —
+  // and keeping it would have meant two rules again.
+  const backend = backendReturning(OWNER, [], [
+    attribute('alsoKnownAs', [item('https://example.com/a', true)]),
+  ]);
+  const doc = await new Resolver(backend).resolve(DID);
+
+  assert.ok(!('alsoKnownAs' in doc));
+});
+
 // The backend's job is to reproduce what the subgraph stores, which for a service
 // is the whole blob — Resolver's assembly is what decodes it, so both backends get
 // the same treatment. The end-to-end expectation is asserted below and mirrored in
@@ -345,7 +373,7 @@ test('a service blob with invalid UTF-8 is dropped, as the indexer drops it', as
   ]);
   const doc = await new Resolver(backend).resolve(DID);
 
-  assert.deepEqual(doc.service, []);
+  assert.ok(!('service' in doc));
   // And the document as a whole still resolves: one operator's malformed entry must
   // cost that entry, not a 500 for every DID that has one.
   assert.equal(doc.id, DID);
@@ -463,7 +491,7 @@ test('the rpc backend drops a blob that is not a JSON object before assembly eve
       attribute('verificationMethod', [item(value)]),
     ]);
     const doc = await new Resolver(backend).resolve(DID);
-    assert.deepEqual(doc.verificationMethod, [], value);
+    assert.ok(!('verificationMethod' in doc), value);
   }
 });
 
@@ -494,7 +522,7 @@ test('a verification method with an invalid UTF-8 byte is dropped, not served ke
   ]);
   const doc = await new Resolver(backend).resolve(DID);
 
-  assert.deepEqual(doc.verificationMethod, []);
+  assert.ok(!('verificationMethod' in doc));
   assert.equal(doc.id, DID);
 });
 
