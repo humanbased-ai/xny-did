@@ -81,11 +81,24 @@ class Resolver {
         owner: didDoc.owner,
       };
 
-      if (didDoc.alsoKnownAs) {
+      // One rule for every list-valued property below: a property with no usable
+      // entries is omitted, never emitted as []. The direction is not a preference.
+      // DID Core says a verification relationship "MUST be a set of one or more
+      // verification methods", so `authentication: []` is invalid and those five
+      // have to be omitted; `verificationMethod` and `service` carry no such floor,
+      // so [] is legal for them but omission is legal too. Omitting is therefore
+      // the only choice that can be applied to all of them, and "if present" in
+      // front of each definition is what makes it safe.
+      //
+      // Written as a length check rather than a truthiness one because both
+      // backends hand this step [] rather than a missing key — the rpc backend
+      // initialises the lists, and a derived list field on the subgraph comes back
+      // [] — so `if (didDoc.service)` always passed.
+      if (didDoc.alsoKnownAs?.length) {
         document.alsoKnownAs = didDoc.alsoKnownAs;
       }
 
-      if (didDoc.verificationMethod) {
+      if (didDoc.verificationMethod?.length) {
         document.verificationMethod = didDoc.verificationMethod.map((vm) => {
           // The same decode the rpc backend validated this blob with, and the same
           // object-or-nothing verdict. Decoding strictly here rejected bytes the
@@ -190,7 +203,7 @@ class Resolver {
         }
       }
 
-      if (didDoc.service) {
+      {
         // The indexer parses the on-chain JSON and validates it, then stores the
         // whole blob rather than the endpoint it just validated
         // (arrayAttributeHandler.ts:326-337), and the schema types that Bytes. So
@@ -210,7 +223,13 @@ class Resolver {
         // Nothing reachable should need that: an entry only gets here once the
         // same decoder has already accepted it — by the indexer before it created
         // the entity, or by the rpc backend before it appended the entry.
-        document.service = didDoc.service
+        //
+        // Filtered into a local and assigned only if something survived, because
+        // the filter can empty a list that arrived non-empty — a DID whose every
+        // service carries an endpoint DID Core does not admit. That has to reach
+        // the same verdict as a DID with no services at all, and it cannot if the
+        // emptiness is judged before the filter runs.
+        const services = (didDoc.service || [])
           .map((svc) => ({
             id: svc.id,
             type: svc.type,
@@ -222,6 +241,10 @@ class Resolver {
           // map, or a set of those and nothing else, and an entry no client can
           // dial is worth less than no entry at all.
           .filter((svc) => isServiceEndpoint(svc.serviceEndpoint));
+
+        if (services.length) {
+          document.service = services;
+        }
       }
 
       return document;
