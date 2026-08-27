@@ -1,17 +1,39 @@
 name: Indexer tests
 
+# The indexer's suite had never run anywhere automatic. Unlike the resolver there
+# is no deploy workflow to fall back on either — the subgraph is deployed by hand
+# with `npm run deploy:base` — so until this existed the tests were documentation
+# rather than a gate.
+#
+# What they hold up is a coupling that no single file expresses: the resolver's
+# rpc backend reproduces this indexer's handler decisions, and cites them by line
+# in a dozen places, so that the two resolver backends stay indistinguishable.
+# tests/utf8.test.ts additionally pins graph-node host-function behaviour, which
+# is not visible from either codebase — `json.fromBytes` and
+# `typeConversion.bytesToString` are Rust externals declared as bare declarations
+# in graph-ts. A graph-ts bump that changed their strictness would invert the
+# decision services/resolver/service/bytes.js is built on, and nothing else would
+# notice.
+#
+# `workflow_call` mirrors resolver-tests.yml so that a future indexer deploy
+# workflow can reuse this exact job as its pre-deploy gate instead of restating
+# the node version and cache key.
 on:
   pull_request:
     paths:
       - 'services/indexer/**'
       - '.github/workflows/indexer-tests.yml'
+  workflow_call:
 
+# Declared, not inherited: a workflow_call caller may hold credentials this job
+# has no business seeing while it runs `npm ci` and every dependency lifecycle
+# script with it. A called workflow can only narrow the caller's permissions.
 permissions:
   contents: read
 
 jobs:
   test:
-    name: Run indexer tests
+    name: Indexer tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,9 +49,15 @@ jobs:
 
       - run: npm ci
 
-      # generated/ is gitignored, so the tests do not compile without this.
-      # Unlike the resolver suite, which needs no build step at all.
+      # generated/ is gitignored, so nothing compiles without this. The resolver
+      # suite needs no equivalent — this step is the one real difference.
       - run: npm run codegen
 
-      - name: Run indexer tests
-        run: npx graph test
+      # `graph test`, not the `npm test` script, which is `graph test -d`. The -d
+      # form runs matchstick inside a container built here from an
+      # x86_64 base image: on a developer's arm64 machine that container is the
+      # only way to run a linux binary, but this runner is already linux/amd64,
+      # so it would mean a multi-minute image build (the generated Dockerfile
+      # apt-installs postgres and llvm) to reach a binary that runs natively in
+      # about six seconds. It also uses `docker run -it`, which has no TTY here.
+      - run: npx graph test
