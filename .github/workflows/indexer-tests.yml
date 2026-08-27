@@ -1,0 +1,90 @@
+name: Indexer tests
+
+# PROBE — this file is temporary and will be rewritten before review.
+#
+# The indexer's tests have never run in CI, and the three ways of invoking
+# matchstick that were tried locally each failed or succeeded for reasons that
+# may be specific to an arm64 Mac. All three are run here in one job, none of
+# them fatal, so a single CI run says which one this runner supports instead of
+# costing a push-and-wait per hypothesis.
+#
+# What is being asked:
+#   A  does the native binary work? The docker image exists to give a non-Linux
+#      machine a Linux host for binary-linux-22; this runner already is one, so
+#      `graph test` without -d may just work — no docker, no image build.
+#   B  does the no-filter run still panic? It panicked locally reading a .gpg
+#      file, but the image is FROM --platform=linux/x86_64 and was therefore
+#      emulated there and is native here.
+#   C  the per-suite fallback, known to work locally.
+on:
+  pull_request:
+    paths:
+      - 'services/indexer/**'
+      - '.github/workflows/indexer-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe matchstick invocations
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/indexer
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: services/indexer/package-lock.json
+
+      - run: npm ci
+
+      # generated/ is gitignored, so the tests do not compile without this.
+      # Unlike the resolver suite, which needs no build step at all.
+      - run: npm run codegen
+
+      # A
+      - id: native
+        name: 'A: graph test (no docker)'
+        continue-on-error: true
+        run: npx graph test
+
+      # Only pay for the image if A failed. Cold build is several minutes: the
+      # generated Dockerfile apt-installs postgres and llvm.
+      - id: image
+        name: Build the matchstick image
+        if: steps.native.outcome == 'failure'
+        continue-on-error: true
+        run: docker build -t matchstick -f tests/.docker/Dockerfile .
+
+      # B — deliberately not `docker run -it`: graph-cli uses -it, which is what
+      # fails without a TTY, and CI has no TTY either.
+      - id: docker_all
+        name: 'B: docker, no suite filter'
+        if: steps.image.outcome == 'success'
+        continue-on-error: true
+        run: docker run --rm -v "$PWD":/matchstick matchstick
+
+      # C
+      - id: docker_named
+        name: 'C: docker, per suite'
+        if: steps.image.outcome == 'success'
+        continue-on-error: true
+        run: |
+          for s in did-registry utf8; do
+            echo "--- $s"
+            docker run --rm -e ARGS="$s" -v "$PWD":/matchstick matchstick
+          done
+
+      # Always green: the point is the verdict, not the outcome. A failing job
+      # would say nothing that the step outcomes do not already say.
+      - name: Verdict
+        run: |
+          echo "A native       : ${{ steps.native.outcome }}"
+          echo "  image build  : ${{ steps.image.outcome || 'skipped' }}"
+          echo "B docker all   : ${{ steps.docker_all.outcome || 'skipped' }}"
+          echo "C docker named : ${{ steps.docker_named.outcome || 'skipped' }}"
