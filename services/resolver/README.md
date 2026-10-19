@@ -30,8 +30,9 @@ and the Base mainnet rpc defaults would disagree simply by reading two different
 
 The image defaults to `rpc` and starts with no environment variables set, which is what
 running as a Universal Resolver driver requires: DIF builds and runs the container on
-their own infrastructure from a public `.env`. The subgraph backend is faster and is what
-the self-hosted instances use.
+their own infrastructure from a public `.env`. The self-hosted manifests select their
+backend explicitly. Staging uses direct RPC reads on Base Sepolia; subgraph mode serves
+indexed state instead of current RPC state.
 
 | Variable | Backend | Default |
 | -------- | ------- | ------- |
@@ -53,7 +54,20 @@ diffs the serialized document should not assume a stable order.
 Base mainnet is the authoritative deployment for `did:xny` resolution
 (`docs/xny-did-method.md`), so the rpc defaults point at it. Pointing the resolver at a
 testnet deployment means overriding `RESOLVER_RPC_URL`, `RESOLVER_REGISTRY_ADDRESS` and
-`RESOLVER_CHAIN_ID` together.
+`RESOLVER_CHAIN_ID` together. Staging sets chain `84532` and registry
+`0x49bc9d93B52367b9Fc173C5bA206d0202A89643a`; its RPC endpoint comes from the existing
+`xny-secrets/XNY_RPC_URL` reference. The staging manifest retains its Graph configuration
+and credential reference, but RPC mode does not use them.
+
+`RESOLVER_CHAIN_ID` configures ethers' static network; it does not independently verify
+the actual endpoint's chain. After an operator-approved cutover, explicitly request
+`eth_chainId` through the resolver's configured source, require the intended chain, and
+check the registry and a known DID before accepting resolution. Do not switch to another
+endpoint automatically if these checks fail.
+
+A DID's owner address alone does not supply a VC verification key. An ES256K issuer needs
+an active `EcdsaSecp256k1VerificationKey2019` verification method carrying its signing
+public key, referenced by `assertionMethod`. Switching backends does not create it.
 
 ## Content Negotiation
 

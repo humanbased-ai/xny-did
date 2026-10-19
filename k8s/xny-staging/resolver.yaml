@@ -55,24 +55,29 @@ spec:
           ports:
             - containerPort: 8080
               protocol: TCP
-          # RESOLVER_GRAPH_URL comes from here. config.get() throws on a missing
-          # key, so a namespace without it fails the pod on boot rather than
-          # letting it serve errors.
+          # Retained Graph configuration comes from this ConfigMap; RPC mode does not use it.
           envFrom:
             - configMapRef:
                 name: xny-common
           env:
-            # The image defaults to the rpc backend so it can run without secrets on
-            # Universal Resolver infrastructure. The self-hosted instances read the
-            # subgraph instead, and have to say so.
+            # Keep staging's chain and registry explicit: image defaults target Base mainnet.
             - name: RESOLVER_BACKEND
-              value: subgraph
+              value: rpc
+            - name: RESOLVER_CHAIN_ID
+              value: "84532"
+            - name: RESOLVER_REGISTRY_ADDRESS
+              value: "0x49bc9d93B52367b9Fc173C5bA206d0202A89643a"
+            - name: RESOLVER_RPC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: xny-secrets
+                  key: XNY_RPC_URL
             - name: RESOLVER_GRAPH_ACCESS_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: xny-secrets
                   key: RESOLVER_GRAPH_ACCESS_TOKEN
-          # /health never calls the subgraph: an upstream outage must not
+          # /health never calls the backend: an upstream outage must not
           # restart-loop the pods on top of it.
           startupProbe:
             httpGet:
@@ -158,7 +163,7 @@ spec:
 ---
 # Provisions an external HTTP(S) load balancer. Its backend health check is
 # derived from the pod's readinessProbe, i.e. /ready — which is why that endpoint
-# reports local serving capability only. Were it to probe the subgraph, one
+# reports local serving capability only. Were it to probe the backend, one
 # upstream blip would fail every replica at once and the load balancer would
 # answer 502 for the whole service instead of the resolver returning an error for
 # the one request that hit the problem.
