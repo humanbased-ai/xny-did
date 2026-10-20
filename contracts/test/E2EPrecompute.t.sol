@@ -241,13 +241,16 @@ contract E2EPrecomputeTest is Test {
         bytes1 c = b[start + 1];
         bytes1 d = b[start + 2];
         bytes1 sep = b[start + 3];
-        bool isHex = (a == 0x68 /*'h'*/
+        bool isHex = (
+                a == 0x68 /*'h'*/
                 || a == 0x48 /*'H'*/
             )
-            && (c == 0x65 /*'e'*/
+            && (
+                c == 0x65 /*'e'*/
                 || c == 0x45 /*'E'*/
             )
-            && (d == 0x78 /*'x'*/
+            && (
+                d == 0x78 /*'x'*/
                 || d == 0x58 /*'X'*/
             );
         bool isSep = sep == 0x20 /*' '*/ || sep == 0x09; /*'\t'*/
