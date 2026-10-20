@@ -45,7 +45,7 @@ spec:
       securityContext:
         seccompProfile:
           type: RuntimeDefault
-      # Covers the 5s drain plus the 10s upstream timeout with room to spare;
+      # Covers the 5s drain plus two 10s upstream attempts with room to spare;
       # see the shutdown comment in services/resolver/index.js.
       terminationGracePeriodSeconds: 30
       containers:
@@ -55,14 +55,14 @@ spec:
           ports:
             - containerPort: 8080
               protocol: TCP
-          # Retained Graph configuration comes from this ConfigMap; RPC mode does not use it.
+          # Graph configuration comes from this ConfigMap; RPC remains the fallback.
           envFrom:
             - configMapRef:
                 name: xny-common
           env:
             # Keep staging's chain and registry explicit: image defaults target Base mainnet.
             - name: RESOLVER_BACKEND
-              value: rpc
+              value: subgraph
             - name: RESOLVER_CHAIN_ID
               value: "84532"
             - name: RESOLVER_REGISTRY_ADDRESS

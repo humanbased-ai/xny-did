@@ -40,11 +40,11 @@ server.listen(serverPort, function () {
 // the pod only dies at SIGKILL).
 //
 // There is deliberately no forced-exit backstop, because every request is bounded
-// by the upstream timeout. That holds only while
+// by one upstream timeout in rpc mode, at most two in subgraph mode. That holds while
 //
-//     RESOLVER_DRAIN_MS + RESOLVER_TIMEOUT_MS < terminationGracePeriodSeconds
+//     RESOLVER_DRAIN_MS + 2 * RESOLVER_TIMEOUT_MS < terminationGracePeriodSeconds
 //
-// which the defaults (5s + 10s against 30s) satisfy with room to spare. Raise
+// which the defaults (5s + 20s against 30s) satisfy with room to spare. Raise
 // either one past that budget and a request in flight gets killed mid-response
 // instead of drained — add the backstop then rather than widening the window.
 function shutdown(signal) {

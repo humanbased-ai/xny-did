@@ -33,22 +33,29 @@ class SubgraphBackend {
     const req = new ethers.FetchRequest(this.graphUrl);
     req.method = 'POST';
     req.timeout = this.timeoutMs;
+    req.retryFunc = () => false;
     req.setHeader('Content-Type', 'application/json');
     req.setHeader('Authorization', this.accessToken);
     req.body = { query: QUERY, variables: { didId: identifier } };
 
     const response = await req.send();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw new ResolveError('Graph upstream request failed', 500, 'internalError');
+    }
     const result = response.bodyJson;
 
-    if (result.errors) {
-      throw new ResolveError(
-        result.errors.map((e) => e.message).join(', '),
-        500,
-        'internalError'
-      );
+    if (
+      result.errors !== undefined &&
+      (!Array.isArray(result.errors) || result.errors.length > 0)
+    ) {
+      throw new ResolveError('Graph query failed', 500, 'internalError');
     }
 
-    return result.data.diddocument || null;
+    const document = result.data.diddocument;
+    if (document !== null && document?.id !== identifier) {
+      throw new ResolveError('Invalid Graph document response', 500, 'internalError');
+    }
+    return document;
   }
 }
 

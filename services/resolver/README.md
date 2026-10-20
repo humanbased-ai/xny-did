@@ -17,29 +17,46 @@ did:xny:95228308-9d75-4dd8-8958-2713b92d3d71
 
 ## Backends
 
-Resolution reads from one of two backends, selected by `RESOLVER_BACKEND`. Both produce
-the same DID Document for the same DID, provided the subgraph indexes the same registry
-contract on the same chain that the rpc backend is pointed at — the checked-in
+Resolution uses the existing `rpc` or `subgraph` mode selected by `RESOLVER_BACKEND`.
+Both sources use the same document shape, but must target the same registry contract
+on the same chain — the checked-in
 `services/indexer/subgraph.yaml` targets Base Sepolia, so a local subgraph built from it
 and the Base mainnet rpc defaults would disagree simply by reading two different chains.
 
 | `RESOLVER_BACKEND` | Reads | Needs a secret |
 | ------------------ | ----- | -------------- |
 | `rpc` (default)    | `DIDRegistry.getDidDocument` over a public Base mainnet RPC endpoint | no |
-| `subgraph`         | the indexed subgraph on The Graph | yes, `RESOLVER_GRAPH_ACCESS_TOKEN` |
+| `subgraph`         | Graph first, then one RPC attempt on upstream failure or a missing DID | yes, `RESOLVER_GRAPH_ACCESS_TOKEN` |
 
 The image defaults to `rpc` and starts with no environment variables set, which is what
 running as a Universal Resolver driver requires: DIF builds and runs the container on
 their own infrastructure from a public `.env`. The self-hosted manifests select their
-backend explicitly. Staging uses direct RPC reads on Base Sepolia; subgraph mode serves
-indexed state instead of current RPC state.
+backend explicitly. Staging selects `subgraph` on Base Sepolia with matching RPC settings.
+
+Every valid request in `subgraph` mode tries Graph first. A timeout, transport failure,
+non-success HTTP status, GraphQL error, invalid JSON, missing expected GraphQL data
+or a missing/mismatched document identifier falls back to RPC once. An empty GraphQL `errors` array is not a failure. A valid
+`data.diddocument: null` also goes to RPC, so index lag cannot alone produce a false 404.
+Only a missing DID on RPC returns 404; an RPC failure remains an error. Invalid DIDs are
+rejected before either source is queried. Each next request tries Graph again, with no
+sticky state or merged documents. Static warnings identify fallback without logging
+upstream URLs, credentials or response bodies.
+
+Each attempt uses `RESOLVER_TIMEOUT_MS` (10 seconds by default), so a request falling back
+can take up to twice that budget. There is no Graph retry loop. Failed document assembly
+after a successful fetch is an error, not a reason to try another source.
+
+This improves availability, not freshness. A successful Graph response may lag current
+chain state, including key revocations, and will be returned without RPC confirmation.
+Applications needing current authorization state must not treat error fallback as a
+freshness guarantee. The existing finalized payment/anchor delivery checks are unchanged.
 
 | Variable | Backend | Default |
 | -------- | ------- | ------- |
 | `RESOLVER_BACKEND` | both | `rpc` |
-| `RESOLVER_RPC_URL` | rpc | `https://mainnet.base.org` |
-| `RESOLVER_REGISTRY_ADDRESS` | rpc | `0xf73eD23b998b3987503F4F4Ba4eAb85386ebfCC4` (Base mainnet registry proxy) |
-| `RESOLVER_CHAIN_ID` | rpc | `8453` |
+| `RESOLVER_RPC_URL` | both | `https://mainnet.base.org` |
+| `RESOLVER_REGISTRY_ADDRESS` | both | `0xf73eD23b998b3987503F4F4Ba4eAb85386ebfCC4` (Base mainnet registry proxy) |
+| `RESOLVER_CHAIN_ID` | both | `8453` |
 | `RESOLVER_GRAPH_URL` | subgraph | none, required |
 | `RESOLVER_GRAPH_ACCESS_TOKEN` | subgraph | none, required |
 | `RESOLVER_TIMEOUT_MS` | both | `10000` |
@@ -56,8 +73,10 @@ Base mainnet is the authoritative deployment for `did:xny` resolution
 testnet deployment means overriding `RESOLVER_RPC_URL`, `RESOLVER_REGISTRY_ADDRESS` and
 `RESOLVER_CHAIN_ID` together. Staging sets chain `84532` and registry
 `0x49bc9d93B52367b9Fc173C5bA206d0202A89643a`; its RPC endpoint comes from the existing
-`xny-secrets/XNY_RPC_URL` reference. The staging manifest retains its Graph configuration
-and credential reference, but RPC mode does not use them.
+`xny-secrets/XNY_RPC_URL` reference. Its existing Graph configuration and credential
+reference remain unchanged. The production manifest declares a Base mainnet subgraph,
+matching the RPC defaults. Local subgraph configurations must supply matching RPC
+settings when their indexed deployment differs from those defaults.
 
 `RESOLVER_CHAIN_ID` configures ethers' static network; it does not independently verify
 the actual endpoint's chain. After an operator-approved cutover, explicitly request
