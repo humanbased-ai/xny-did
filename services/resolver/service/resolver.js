@@ -290,11 +290,33 @@ function createBackend() {
   const backend = setting('RESOLVER_BACKEND') || 'rpc';
 
   if (backend === 'subgraph') {
-    return new SubgraphBackend(
+    const graph = new SubgraphBackend(
       config.get('RESOLVER_GRAPH_URL'),
       config.get('RESOLVER_GRAPH_ACCESS_TOKEN'),
       timeoutMs
     );
+    const rpc = new RpcBackend(
+      setting('RESOLVER_RPC_URL'),
+      setting('RESOLVER_REGISTRY_ADDRESS'),
+      timeoutMs,
+      integerSetting('RESOLVER_CHAIN_ID')
+    );
+    return {
+      async fetch(identifier) {
+        let document;
+        try {
+          document = await graph.fetch(identifier);
+        } catch (_) {
+          console.warn('Graph query failed; trying RPC once');
+          return rpc.fetch(identifier);
+        }
+        if (document !== null) {
+          return document;
+        }
+        console.warn('Graph DID not found; confirming through RPC');
+        return rpc.fetch(identifier);
+      },
+    };
   }
 
   // Falling through to rpc on a typo would leave a pod healthy and quietly serving

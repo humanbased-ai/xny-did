@@ -1,6 +1,9 @@
 {
   "_comment": "Only needed to run the subgraph backend locally. The default rpc backend needs no configuration at all.",
   "RESOLVER_BACKEND": "subgraph",
+  "RESOLVER_RPC_URL": "YOUR_BASE_SEPOLIA_RPC_URL",
+  "RESOLVER_CHAIN_ID": 84532,
+  "RESOLVER_REGISTRY_ADDRESS": "0x49bc9d93B52367b9Fc173C5bA206d0202A89643a",
   "RESOLVER_GRAPH_URL": "https://api.studio.thegraph.com/query/1757359/did-base/version/latest",
   "RESOLVER_GRAPH_ACCESS_TOKEN": "YOUR_GRAPH_ACCESS_TOKEN"
 }

@@ -86,9 +86,9 @@ spec:
       # connections to it, which on a public endpoint is a client-visible 502 per
       # replica per deploy.
       #
-      # index.js requires RESOLVER_DRAIN_MS + RESOLVER_TIMEOUT_MS to stay under
+      # index.js requires RESOLVER_DRAIN_MS + 2 * RESOLVER_TIMEOUT_MS under
       # this, or an in-flight request gets killed mid-response rather than
-      # drained. 60s + 10s against 90s holds. Re-check that sum before tuning
+      # drained. 60s + 20s against 90s holds. Re-check that sum before tuning
       # either value.
       terminationGracePeriodSeconds: 90
       containers:
@@ -108,7 +108,7 @@ spec:
           env:
             # The image defaults to the rpc backend so it can run without secrets on
             # Universal Resolver infrastructure. The self-hosted instances read the
-            # subgraph instead, and have to say so.
+            # subgraph first with RPC fallback, and have to say so.
             - name: RESOLVER_BACKEND
               value: subgraph
             # See terminationGracePeriodSeconds above for why this is 60s here
